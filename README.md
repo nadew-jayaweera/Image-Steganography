@@ -56,14 +56,13 @@
 
 **Requirements** (tested with Python 3.9+):
 - Python 3.x
-- Pillow (`pip install Pillow`)
-- numpy (`pip install numpy`)
+- See `requirements.txt` for dependencies.
 
 Optional (if packaging into a standalone binary):
 - `pyinstaller` or `cx_Freeze`
 
 ```bash
-pip install pillow numpy
+pip install -r requirements.txt
 ```
 
 ---
