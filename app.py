@@ -6,8 +6,8 @@ A sleek, modern steganography application with dark theme.
 
 import tkinter as tk
 from tkinter import ttk, filedialog
-from PIL import Image, ImageTk, ExifTags, ImageDraw
-import numpy as np
+from PIL import Image, ImageTk, ExifTags, ImageDraw # type: ignore
+import numpy as np # type: ignore
 import math
 import os
 from datetime import datetime
