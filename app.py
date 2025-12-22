@@ -1,14 +1,17 @@
+#!/usr/bin/env python3
+"""
+CyberMaths Steganography Tool - Modern UI Edition
+A sleek, modern steganography application with dark theme.
+"""
+
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox, simpledialog
-from PIL import Image, ImageTk, ExifTags
-import numpy as np
+from tkinter import ttk, filedialog
+from PIL import Image, ImageTk, ExifTags, ImageDraw # type: ignore
+import numpy as np # type: ignore
 import math
 import os
-import random
-from datetime import datetime  # Added for timestamp formatting
+from datetime import datetime
 import platform
-import sys
-import time
 
 # -------------------------------------------------------------------------
 # BACKEND LOGIC (The Maths & Algorithms)
@@ -39,13 +42,11 @@ class StegoEngine:
         img1 = np.array(original_img).astype(np.float64)
         img2 = np.array(stego_img).astype(np.float64)
         
-        # Mean Squared Error (Maths Concept: Statistics/Matrices)
         mse = np.mean((img1 - img2) ** 2)
         
         if mse == 0:
-            return 0, float('inf') # Images are identical
+            return 0, float('inf')
         
-        # Peak Signal-to-Noise Ratio (Maths Concept: Logarithms)
         max_pixel = 255.0
         psnr = 20 * math.log10(max_pixel / math.sqrt(mse))
         
@@ -62,7 +63,6 @@ class StegoEngine:
         encrypted = []
         key_len = len(key)
         for i, char in enumerate(message):
-            # XOR operation
             encrypted.append(chr(ord(char) ^ ord(key[i % key_len])))
         return ''.join(encrypted)
 
@@ -74,33 +74,24 @@ class StegoEngine:
         image = Image.open(image_path)
         img_array = np.array(image)
         
-        # 1. Prepare Message
         if password:
             message = StegoEngine.xor_encrypt(message, password)
             
-        # Add a delimiter to know when to stop reading
         message += "$$STOP$$"
         
         binary_message = StegoEngine.to_binary(message)
         data_len = len(binary_message)
         
-        # 2. Check Capacity (Maths: Area/Volume)
-        total_pixels = img_array.size # Rows * Cols * Channels
+        total_pixels = img_array.size
         if data_len > total_pixels:
             raise ValueError(f"Message too large. Need {data_len} bits, image has {total_pixels} pixels.")
 
-        # 3. Flatten the matrix for easier iteration
         flat_img = img_array.flatten()
         
-        # 4. Modify LSBs (The Core Maths)
-        # We iterate through the flattened array and modify the last bit
         for i in range(data_len):
-            # Clear LSB (Bitwise AND with 11111110)
             flat_img[i] = flat_img[i] & 254 
-            # Set LSB (Bitwise OR with message bit)
             flat_img[i] = flat_img[i] | int(binary_message[i])
             
-        # 5. Reshape back to image matrix
         stego_array = flat_img.reshape(img_array.shape)
         stego_image = Image.fromarray(stego_array.astype('uint8'), image.mode)
         
@@ -116,30 +107,21 @@ class StegoEngine:
         flat_img = img_array.flatten()
         
         binary_data = ""
-        
-        # Extract LSBs
-        # Note: In a real scenario, we wouldn't read the whole image, just until delimiter
-        # But for this demo, we read chunks to be efficient
-        
-        chunk_size = 1000 # Read in chunks to avoid freezing
         decoded_string = ""
         
         for i in range(len(flat_img)):
-            # Get the LSB (Bitwise AND 1)
             binary_data += str(flat_img[i] & 1)
             
-            # Every 8 bits = 1 character
             if len(binary_data) >= 8:
                 char_code = int(binary_data[:8], 2)
                 char = chr(char_code)
                 decoded_string += char
-                binary_data = binary_data[8:] # Remove processed bits
+                binary_data = binary_data[8:]
                 
-                # Check for delimiter
                 if decoded_string.endswith("$$STOP$$"):
-                    final_msg = decoded_string[:-8] # Remove delimiter
+                    final_msg = decoded_string[:-8]
                     if password:
-                        return StegoEngine.xor_encrypt(final_msg, password) # XOR is symmetric
+                        return StegoEngine.xor_encrypt(final_msg, password)
                     return final_msg
                     
         return "No hidden message found or delimiter missing."
@@ -147,728 +129,1022 @@ class StegoEngine:
     @staticmethod
     def get_exif_data(image_path):
         """
-        Extracts detailed metadata mimicking 'exiftool' by reading filesystem stats
-        and image properties.
+        Extracts detailed metadata from the image.
         """
         try:
             img = Image.open(image_path)
             stats = os.stat(image_path)
             info_list = []
 
-            # --- 1. File System Metadata (Matches ExifTool top section) ---
-            info_list.append(f"File Name      : {os.path.basename(image_path)}")
-            info_list.append(f"Directory      : {os.path.dirname(image_path) or '.'}")
+            info_list.append(f"{'File Name':<20}: {os.path.basename(image_path)}")
+            info_list.append(f"{'Directory':<20}: {os.path.dirname(image_path) or '.'}")
             
-            # File Size in kB
             size_kb = stats.st_size / 1024
-            info_list.append(f"File Size      : {size_kb:.1f} kB")
+            info_list.append(f"{'File Size':<20}: {size_kb:.1f} kB")
             
-            # Dates
             mod_time = datetime.fromtimestamp(stats.st_mtime).strftime('%Y:%m:%d %H:%M:%S')
             acc_time = datetime.fromtimestamp(stats.st_atime).strftime('%Y:%m:%d %H:%M:%S')
-            info_list.append(f"File Mod Date  : {mod_time}")
-            info_list.append(f"File Access Date : {acc_time}")
+            info_list.append(f"{'File Mod Date':<20}: {mod_time}")
+            info_list.append(f"{'File Access Date':<20}: {acc_time}")
             
-            # Type Info
-            info_list.append(f"File Type      : {img.format}")
-            info_list.append(f"MIME Type      : {Image.MIME.get(img.format, 'image/' + img.format.lower())}")
+            info_list.append(f"{'File Type':<20}: {img.format}")
+            info_list.append(f"{'MIME Type':<20}: {Image.MIME.get(img.format, 'image/' + img.format.lower())}")
 
-            # --- 2. Image Specific Metadata ---
-            info_list.append(f"Image Width    : {img.width}")
-            info_list.append(f"Image Height   : {img.height}")
-            info_list.append(f"Image Size     : {img.width}x{img.height}")
+            info_list.append(f"{'Image Width':<20}: {img.width}")
+            info_list.append(f"{'Image Height':<20}: {img.height}")
+            info_list.append(f"{'Image Size':<20}: {img.width}x{img.height}")
             
-            # Megapixels Calculation
             mp = (img.width * img.height) / 1000000
-            info_list.append(f"Megapixels     : {mp:.3f}")
+            info_list.append(f"{'Megapixels':<20}: {mp:.3f}")
 
-            # Bit Depth Inference (PIL 'mode' mapping)
-            # '1': 1-bit pixels, 'L': 8-bit, 'RGB': 3x8-bit, 'RGBA': 4x8-bit
             bit_depth_map = {'1': 1, 'L': 8, 'P': 8, 'RGB': 8, 'RGBA': 8, 'CMYK': 8, 'YCbCr': 8, 'I': 32, 'F': 32}
             bit_depth = bit_depth_map.get(img.mode, 'Unknown')
-            info_list.append(f"Bit Depth      : {bit_depth}")
-            info_list.append(f"Color Type     : {img.mode}")
+            info_list.append(f"{'Bit Depth':<20}: {bit_depth}")
+            info_list.append(f"{'Color Type':<20}: {img.mode}")
 
-            info_list.append("-" * 30)
+            info_list.append("─" * 45)
 
-            # --- 3. Internal Metadata (PNG Info / JPG EXIF) ---
             has_extra = False
             
-            # PNG Info
             if img.info:
                 for key, value in img.info.items():
-                    if key in ['dpi', 'transparency']: continue # Skip verbose binary data
+                    if key in ['dpi', 'transparency']: 
+                        continue
                     if isinstance(value, (str, int, float)):
-                        info_list.append(f"{key:<15}: {value}")
+                        info_list.append(f"{key:<20}: {value}")
                         has_extra = True
 
-            # Standard EXIF (JPG)
             exif_data = img.getexif()
             if exif_data:
                 for tag_id, value in exif_data.items():
                     tag = ExifTags.TAGS.get(tag_id, tag_id)
                     if isinstance(value, bytes):
                         value = "<Binary>"
-                    info_list.append(f"{tag:<15}: {value}")
+                    info_list.append(f"{tag:<20}: {value}")
                     has_extra = True
             
             if not has_extra:
-                info_list.append("No additional internal metadata (like comments) found.")
+                info_list.append("No additional internal metadata found.")
 
             return "\n".join(info_list)
             
         except Exception as e:
             return f"Error reading metadata: {str(e)}"
 
+
 # -------------------------------------------------------------------------
-# FRONTEND LOGIC (The GUI)
+# MODERN UI COMPONENTS
 # -------------------------------------------------------------------------
 
-class ThemeManager:
-    """Manages application themes and system theme detection."""
+class ModernColors:
+    """Modern color palette for dark theme."""
+    BG_PRIMARY = "#0f0f0f"
+    BG_SECONDARY = "#1a1a1a"
+    BG_TERTIARY = "#252525"
+    BG_CARD = "#1e1e1e"
     
-    # Dark Theme Colors
-    DARK_THEME = {
-        "BG_COLOR": "#0D1117",
-        "FG_COLOR": "#E6EDF3",
-        "ACCENT_COLOR": "#58A6FF",
-        "ACCENT_HOVER": "#79C0FF",
-        "SUCCESS_COLOR": "#3FB950",
-        "DANGER_COLOR": "#F85149",
-        "SECONDARY_BG": "#161B22",
-        "BORDER_COLOR": "#30363D"
-    }
+    TEXT_PRIMARY = "#ffffff"
+    TEXT_SECONDARY = "#a0a0a0"
+    TEXT_MUTED = "#666666"
     
-    # Light Theme Colors
-    LIGHT_THEME = {
-        "BG_COLOR": "#FFFFFF",
-        "FG_COLOR": "#1F2937",
-        "ACCENT_COLOR": "#0066CC",
-        "ACCENT_HOVER": "#0052A3",
-        "SUCCESS_COLOR": "#10B981",
-        "DANGER_COLOR": "#EF4444",
-        "SECONDARY_BG": "#F3F4F6",
-        "BORDER_COLOR": "#D1D5DB"
-    }
+    ACCENT_BLUE = "#3b82f6"
+    ACCENT_BLUE_HOVER = "#2563eb"
+    ACCENT_PURPLE = "#8b5cf6"
+    ACCENT_GREEN = "#10b981"
+    ACCENT_GREEN_HOVER = "#059669"
+    ACCENT_RED = "#ef4444"
+    ACCENT_RED_HOVER = "#dc2626"
+    ACCENT_ORANGE = "#f59e0b"
     
-    @staticmethod
-    def get_system_theme():
-        """Detect system theme preference. Returns 'dark' or 'light'."""
-        system = platform.system()
+    BORDER = "#333333"
+    BORDER_LIGHT = "#404040"
+    
+    GRADIENT_START = "#3b82f6"
+    GRADIENT_END = "#8b5cf6"
+
+
+class ModernButton(tk.Canvas):
+    """A modern styled button with gradient, hover effects, and rounded corners."""
+    
+    def __init__(self, parent, text, command=None, variant="primary", width=200, height=44, **kwargs):
+        super().__init__(parent, width=width, height=height, 
+                        bg=ModernColors.BG_PRIMARY, highlightthickness=0, **kwargs)
         
-        if system == "Windows":
-            try:
-                import winreg
-                registry_path = r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
-                registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, registry_path)
-                value, _ = winreg.QueryValueEx(registry_key, "AppsUseLightTheme")
-                winreg.CloseKey(registry_key)
-                return "light" if value == 1 else "dark"
-            except:
-                return "dark"  # Default to dark if detection fails
+        self.text = text
+        self.command = command
+        self.variant = variant
+        self.width = width
+        self.height = height
+        self.is_hovered = False
+        self.is_pressed = False
         
-        elif system == "Darwin":  # macOS
-            try:
-                import subprocess
-                result = subprocess.run(['defaults', 'read', '-g', 'AppleInterfaceStyle'], 
-                                      capture_output=True, text=True)
-                return "dark" if "Dark" in result.stdout else "light"
-            except:
-                return "dark"
+        self._set_colors()
+        self._draw()
         
-        elif system == "Linux":
-            # Linux theme detection is complex, default to dark
-            return "dark"
+        self.bind("<Enter>", self._on_enter)
+        self.bind("<Leave>", self._on_leave)
+        self.bind("<Button-1>", self._on_press)
+        self.bind("<ButtonRelease-1>", self._on_release)
+    
+    def _set_colors(self):
+        """Set colors based on variant."""
+        if self.variant == "primary":
+            self.bg_color = ModernColors.ACCENT_BLUE
+            self.hover_color = ModernColors.ACCENT_BLUE_HOVER
+            self.text_color = "#ffffff"
+        elif self.variant == "success":
+            self.bg_color = ModernColors.ACCENT_GREEN
+            self.hover_color = ModernColors.ACCENT_GREEN_HOVER
+            self.text_color = "#ffffff"
+        elif self.variant == "danger":
+            self.bg_color = ModernColors.ACCENT_RED
+            self.hover_color = ModernColors.ACCENT_RED_HOVER
+            self.text_color = "#ffffff"
+        elif self.variant == "secondary":
+            self.bg_color = ModernColors.BG_TERTIARY
+            self.hover_color = ModernColors.BORDER_LIGHT
+            self.text_color = ModernColors.TEXT_PRIMARY
+        elif self.variant == "gradient":
+            self.bg_color = ModernColors.ACCENT_BLUE
+            self.hover_color = ModernColors.ACCENT_PURPLE
+            self.text_color = "#ffffff"
+    
+    def _draw(self):
+        """Draw the button."""
+        self.delete("all")
         
-        return "dark"  # Fallback default
+        color = self.hover_color if self.is_hovered else self.bg_color
+        if self.is_pressed:
+            color = self.hover_color
+        
+        # Draw rounded rectangle
+        radius = 10
+        self._create_rounded_rect(2, 2, self.width-2, self.height-2, radius, color)
+        
+        # Draw text
+        self.create_text(self.width//2, self.height//2, text=self.text, 
+                        fill=self.text_color, font=("Segoe UI Semibold", 11))
+    
+    def _create_rounded_rect(self, x1, y1, x2, y2, radius, color):
+        """Create a rounded rectangle."""
+        points = [
+            x1 + radius, y1,
+            x2 - radius, y1,
+            x2, y1,
+            x2, y1 + radius,
+            x2, y2 - radius,
+            x2, y2,
+            x2 - radius, y2,
+            x1 + radius, y2,
+            x1, y2,
+            x1, y2 - radius,
+            x1, y1 + radius,
+            x1, y1,
+        ]
+        self.create_polygon(points, fill=color, smooth=True)
+    
+    def _on_enter(self, event):
+        self.is_hovered = True
+        self.config(cursor="hand2")
+        self._draw()
+    
+    def _on_leave(self, event):
+        self.is_hovered = False
+        self.is_pressed = False
+        self._draw()
+    
+    def _on_press(self, event):
+        self.is_pressed = True
+        self._draw()
+    
+    def _on_release(self, event):
+        self.is_pressed = False
+        self._draw()
+        if self.is_hovered and self.command:
+            self.command()
+
+
+class ModernEntry(tk.Frame):
+    """A modern styled entry field with rounded corners."""
+    
+    def __init__(self, parent, placeholder="", show=None, **kwargs):
+        super().__init__(parent, bg=ModernColors.BG_PRIMARY)
+        
+        self.placeholder = placeholder
+        self.show_char = show
+        self.has_focus = False
+        
+        # Container with border
+        self.container = tk.Frame(self, bg=ModernColors.BORDER, padx=1, pady=1)
+        self.container.pack(fill="x")
+        
+        self.inner = tk.Frame(self.container, bg=ModernColors.BG_TERTIARY)
+        self.inner.pack(fill="x", padx=1, pady=1)
+        
+        self.entry = tk.Entry(self.inner, bg=ModernColors.BG_TERTIARY, 
+                             fg=ModernColors.TEXT_PRIMARY,
+                             insertbackground=ModernColors.ACCENT_BLUE,
+                             relief="flat", font=("Segoe UI", 11),
+                             show=show if show else "")
+        self.entry.pack(fill="x", padx=12, pady=10)
+        
+        self.entry.bind("<FocusIn>", self._on_focus_in)
+        self.entry.bind("<FocusOut>", self._on_focus_out)
+    
+    def _on_focus_in(self, event):
+        self.has_focus = True
+        self.container.config(bg=ModernColors.ACCENT_BLUE)
+    
+    def _on_focus_out(self, event):
+        self.has_focus = False
+        self.container.config(bg=ModernColors.BORDER)
+    
+    def get(self):
+        return self.entry.get()
+    
+    def delete(self, first, last):
+        self.entry.delete(first, last)
+    
+    def insert(self, index, string):
+        self.entry.insert(index, string)
+
+
+class ModernText(tk.Frame):
+    """A modern styled text area with rounded corners."""
+    
+    def __init__(self, parent, height=5, **kwargs):
+        super().__init__(parent, bg=ModernColors.BG_PRIMARY)
+        
+        self.has_focus = False
+        
+        # Container with border
+        self.container = tk.Frame(self, bg=ModernColors.BORDER, padx=1, pady=1)
+        self.container.pack(fill="both", expand=True)
+        
+        self.inner = tk.Frame(self.container, bg=ModernColors.BG_TERTIARY)
+        self.inner.pack(fill="both", expand=True, padx=1, pady=1)
+        
+        self.text = tk.Text(self.inner, bg=ModernColors.BG_TERTIARY,
+                           fg=ModernColors.TEXT_PRIMARY,
+                           insertbackground=ModernColors.ACCENT_BLUE,
+                           relief="flat", font=("Segoe UI", 11),
+                           height=height, wrap="word")
+        self.text.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        self.text.bind("<FocusIn>", self._on_focus_in)
+        self.text.bind("<FocusOut>", self._on_focus_out)
+    
+    def _on_focus_in(self, event):
+        self.has_focus = True
+        self.container.config(bg=ModernColors.ACCENT_BLUE)
+    
+    def _on_focus_out(self, event):
+        self.has_focus = False
+        self.container.config(bg=ModernColors.BORDER)
+    
+    def get(self, start, end):
+        return self.text.get(start, end)
+    
+    def delete(self, start, end):
+        self.text.delete(start, end)
+    
+    def insert(self, index, chars):
+        self.text.insert(index, chars)
+    
+    def config(self, **kwargs):
+        self.text.config(**kwargs)
+
+
+class ModernCard(tk.Frame):
+    """A modern card container with subtle border and shadow effect."""
+    
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent, bg=ModernColors.BG_CARD, **kwargs)
+        
+        self.config(highlightbackground=ModernColors.BORDER,
+                   highlightthickness=1,
+                   highlightcolor=ModernColors.BORDER)
+
+
+class ModernRadioButton(tk.Frame):
+    """A modern styled radio button."""
+    
+    def __init__(self, parent, text, variable, value, description="", **kwargs):
+        super().__init__(parent, bg=ModernColors.BG_PRIMARY, **kwargs)
+        
+        self.variable = variable
+        self.value = value
+        self.is_selected = False
+        
+        # Main container
+        self.container = tk.Frame(self, bg=ModernColors.BG_TERTIARY, 
+                                 cursor="hand2")
+        self.container.pack(fill="x", pady=3)
+        
+        # Radio circle
+        self.canvas = tk.Canvas(self.container, width=20, height=20,
+                               bg=ModernColors.BG_TERTIARY, highlightthickness=0)
+        self.canvas.pack(side="left", padx=(12, 8), pady=12)
+        
+        # Text container
+        text_frame = tk.Frame(self.container, bg=ModernColors.BG_TERTIARY)
+        text_frame.pack(side="left", fill="x", expand=True, pady=10)
+        
+        self.label = tk.Label(text_frame, text=text, bg=ModernColors.BG_TERTIARY,
+                             fg=ModernColors.TEXT_PRIMARY, font=("Segoe UI Semibold", 10),
+                             anchor="w")
+        self.label.pack(fill="x")
+        
+        if description:
+            self.desc_label = tk.Label(text_frame, text=description, 
+                                       bg=ModernColors.BG_TERTIARY,
+                                       fg=ModernColors.TEXT_SECONDARY,
+                                       font=("Segoe UI", 9), anchor="w")
+            self.desc_label.pack(fill="x")
+        
+        self._draw_radio()
+        
+        # Bindings
+        for widget in [self.container, self.canvas, self.label, self]:
+            widget.bind("<Button-1>", self._on_click)
+            widget.bind("<Enter>", self._on_enter)
+            widget.bind("<Leave>", self._on_leave)
+        
+        if hasattr(self, 'desc_label'):
+            self.desc_label.bind("<Button-1>", self._on_click)
+            self.desc_label.bind("<Enter>", self._on_enter)
+            self.desc_label.bind("<Leave>", self._on_leave)
+        
+        # Track variable changes
+        self.variable.trace_add("write", lambda *args: self._draw_radio())
+    
+    def _draw_radio(self):
+        """Draw the radio button circle."""
+        self.canvas.delete("all")
+        self.is_selected = self.variable.get() == self.value
+        
+        # Outer circle
+        outer_color = ModernColors.ACCENT_BLUE if self.is_selected else ModernColors.BORDER_LIGHT
+        self.canvas.create_oval(2, 2, 18, 18, outline=outer_color, width=2)
+        
+        # Inner circle (when selected)
+        if self.is_selected:
+            self.canvas.create_oval(6, 6, 14, 14, fill=ModernColors.ACCENT_BLUE, outline="")
+    
+    def _on_click(self, event):
+        self.variable.set(self.value)
+    
+    def _on_enter(self, event):
+        self.container.config(bg=ModernColors.BG_CARD)
+        self.canvas.config(bg=ModernColors.BG_CARD)
+        self.label.config(bg=ModernColors.BG_CARD)
+        if hasattr(self, 'desc_label'):
+            self.desc_label.config(bg=ModernColors.BG_CARD)
+    
+    def _on_leave(self, event):
+        self.container.config(bg=ModernColors.BG_TERTIARY)
+        self.canvas.config(bg=ModernColors.BG_TERTIARY)
+        self.label.config(bg=ModernColors.BG_TERTIARY)
+        if hasattr(self, 'desc_label'):
+            self.desc_label.config(bg=ModernColors.BG_TERTIARY)
+
+
+class ModernModal(tk.Toplevel):
+    """A modern styled modal dialog."""
+    
+    def __init__(self, parent, title, message, modal_type="info"):
+        super().__init__(parent)
+        
+        self.title("")
+        self.resizable(False, False)
+        self.configure(bg=ModernColors.BG_PRIMARY)
+        self.transient(parent)
+        self.grab_set()
+        
+        # Icons and colors based on type
+        icons = {
+            "info": ("ℹ️", ModernColors.ACCENT_BLUE),
+            "success": ("✓", ModernColors.ACCENT_GREEN),
+            "error": ("✕", ModernColors.ACCENT_RED),
+            "warning": ("⚠", ModernColors.ACCENT_ORANGE)
+        }
+        icon, accent = icons.get(modal_type, icons["info"])
+        
+        # Main container
+        main_frame = tk.Frame(self, bg=ModernColors.BG_SECONDARY, 
+                             highlightbackground=ModernColors.BORDER,
+                             highlightthickness=1)
+        main_frame.pack(fill="both", expand=True, padx=0, pady=0)
+        
+        # Header with icon
+        header = tk.Frame(main_frame, bg=ModernColors.BG_SECONDARY)
+        header.pack(fill="x", padx=24, pady=(24, 16))
+        
+        # Icon circle
+        icon_canvas = tk.Canvas(header, width=48, height=48,
+                               bg=ModernColors.BG_SECONDARY, highlightthickness=0)
+        icon_canvas.pack(side="left", padx=(0, 16))
+        icon_canvas.create_oval(4, 4, 44, 44, fill=accent, outline="")
+        icon_canvas.create_text(24, 24, text=icon, fill="#ffffff",
+                               font=("Segoe UI", 16, "bold"))
+        
+        # Title
+        tk.Label(header, text=title, bg=ModernColors.BG_SECONDARY,
+                fg=ModernColors.TEXT_PRIMARY, font=("Segoe UI Semibold", 14),
+                anchor="w").pack(side="left", fill="x", expand=True)
+        
+        # Message
+        msg_label = tk.Label(main_frame, text=message, bg=ModernColors.BG_SECONDARY,
+                            fg=ModernColors.TEXT_SECONDARY, font=("Segoe UI", 11),
+                            wraplength=350, justify="left", anchor="w")
+        msg_label.pack(fill="x", padx=24, pady=(0, 24))
+        
+        # Button container
+        btn_frame = tk.Frame(main_frame, bg=ModernColors.BG_SECONDARY)
+        btn_frame.pack(fill="x", padx=24, pady=(0, 24))
+        
+        # Determine button variant based on modal type
+        btn_variant = "primary"
+        if modal_type == "success":
+            btn_variant = "success"
+        elif modal_type == "error":
+            btn_variant = "danger"
+        
+        ok_btn = ModernButton(btn_frame, text="OK", command=self.destroy,
+                             variant=btn_variant, width=100, height=40)
+        ok_btn.pack(side="right")
+        
+        # Center the modal
+        self.update_idletasks()
+        width = 420
+        height = self.winfo_reqheight()
+        x = parent.winfo_x() + (parent.winfo_width() // 2) - (width // 2)
+        y = parent.winfo_y() + (parent.winfo_height() // 2) - (height // 2)
+        self.geometry(f"{width}x{height}+{x}+{y}")
+        
+        # Bindings
+        self.bind('<Return>', lambda e: self.destroy())
+        self.bind('<Escape>', lambda e: self.destroy())
+        
+        self.focus_set()
+        self.wait_window()
+
+
+class ModernImageDropzone(tk.Frame):
+    """A modern image dropzone with preview and reset functionality."""
+    
+    def __init__(self, parent, on_image_load=None, on_image_reset=None, **kwargs):
+        super().__init__(parent, bg=ModernColors.BG_PRIMARY, **kwargs)
+        
+        self.on_image_load = on_image_load
+        self.on_image_reset = on_image_reset
+        self.image_path = None
+        self.photo = None
+        
+        # Container with dashed border effect
+        self.container = tk.Frame(self, bg=ModernColors.BG_TERTIARY,
+                                 highlightbackground=ModernColors.BORDER,
+                                 highlightthickness=2)
+        self.container.pack(fill="both", expand=True, padx=2, pady=2)
+        
+        # Content frame
+        self.content = tk.Frame(self.container, bg=ModernColors.BG_TERTIARY)
+        self.content.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Icon
+        self.icon_label = tk.Label(self.content, text="🖼️", 
+                                   font=("Segoe UI", 36),
+                                   bg=ModernColors.BG_TERTIARY,
+                                   fg=ModernColors.TEXT_MUTED)
+        self.icon_label.pack(pady=(20, 10))
+        
+        # Text
+        self.text_label = tk.Label(self.content, text="Click to select an image",
+                                   font=("Segoe UI", 11),
+                                   bg=ModernColors.BG_TERTIARY,
+                                   fg=ModernColors.TEXT_SECONDARY)
+        self.text_label.pack()
+        
+        self.subtext_label = tk.Label(self.content, text="Supports PNG, JPG, BMP",
+                                      font=("Segoe UI", 9),
+                                      bg=ModernColors.BG_TERTIARY,
+                                      fg=ModernColors.TEXT_MUTED)
+        self.subtext_label.pack(pady=(5, 20))
+        
+        # Image preview label (hidden initially)
+        self.preview_label = tk.Label(self.content, bg=ModernColors.BG_TERTIARY)
+        
+        # Reset button (hidden initially)
+        self.reset_btn = ModernButton(self.content, text="✕ Remove Image", 
+                                     command=self.reset, variant="danger",
+                                     width=140, height=32)
+        
+        # Bindings
+        for widget in [self, self.container, self.content, self.icon_label, 
+                      self.text_label, self.subtext_label]:
+            widget.bind("<Button-1>", self._on_click)
+            widget.bind("<Enter>", self._on_enter)
+            widget.bind("<Leave>", self._on_leave)
+            widget.config(cursor="hand2")
+    
+    def _on_click(self, event):
+        path = filedialog.askopenfilename(
+            filetypes=[("Images", "*.png;*.jpg;*.jpeg;*.bmp")]
+        )
+        if path:
+            self.load_image(path)
+    
+    def _on_enter(self, event):
+        self.container.config(highlightbackground=ModernColors.ACCENT_BLUE)
+    
+    def _on_leave(self, event):
+        self.container.config(highlightbackground=ModernColors.BORDER)
+    
+    def load_image(self, path):
+        """Load and display an image."""
+        self.image_path = path
+        
+        # Hide dropzone text
+        self.icon_label.pack_forget()
+        self.text_label.pack_forget()
+        self.subtext_label.pack_forget()
+        
+        # Load and resize image
+        img = Image.open(path)
+        img.thumbnail((280, 280))
+        self.photo = ImageTk.PhotoImage(img)
+        
+        # Show preview
+        self.preview_label.config(image=self.photo)
+        self.preview_label.pack(fill="both", expand=True)
+        
+        # Show reset button
+        self.reset_btn.pack(pady=(10, 0))
+        
+        # Callback
+        if self.on_image_load:
+            self.on_image_load(path)
+    
+    def reset(self):
+        """Reset the dropzone."""
+        self.image_path = None
+        self.photo = None
+        self.preview_label.pack_forget()
+        self.reset_btn.pack_forget()
+        self.icon_label.pack(pady=(20, 10))
+        self.text_label.pack()
+        self.subtext_label.pack(pady=(5, 20))
+        
+        # Callback for reset
+        if self.on_image_reset:
+            self.on_image_reset()
+
+
+class ModernTab(tk.Frame):
+    """A modern tab button."""
+    
+    def __init__(self, parent, text, is_active=False, command=None, **kwargs):
+        super().__init__(parent, bg=ModernColors.BG_SECONDARY, **kwargs)
+        
+        self.text = text
+        self.is_active = is_active
+        self.command = command
+        
+        self.label = tk.Label(self, text=text, font=("Segoe UI Semibold", 11),
+                             bg=ModernColors.BG_SECONDARY,
+                             fg=ModernColors.TEXT_PRIMARY if is_active else ModernColors.TEXT_MUTED,
+                             padx=24, pady=12, cursor="hand2")
+        self.label.pack()
+        
+        # Active indicator
+        self.indicator = tk.Frame(self, height=3,
+                                 bg=ModernColors.ACCENT_BLUE if is_active else ModernColors.BG_SECONDARY)
+        self.indicator.pack(fill="x")
+        
+        self.label.bind("<Button-1>", self._on_click)
+        self.label.bind("<Enter>", self._on_enter)
+        self.label.bind("<Leave>", self._on_leave)
+    
+    def _on_click(self, event):
+        if self.command:
+            self.command()
+    
+    def _on_enter(self, event):
+        if not self.is_active:
+            self.label.config(fg=ModernColors.TEXT_SECONDARY)
+    
+    def _on_leave(self, event):
+        if not self.is_active:
+            self.label.config(fg=ModernColors.TEXT_MUTED)
+    
+    def set_active(self, active):
+        self.is_active = active
+        self.label.config(fg=ModernColors.TEXT_PRIMARY if active else ModernColors.TEXT_MUTED)
+        self.indicator.config(bg=ModernColors.ACCENT_BLUE if active else ModernColors.BG_SECONDARY)
+
+
+# -------------------------------------------------------------------------
+# MAIN APPLICATION
+# -------------------------------------------------------------------------
 
 class StegoApp:
     def __init__(self, root):
         self.root = root
         self.root.title("CyberMaths Steganography Tool")
-        self.root.geometry("900x650")
+        self.root.geometry("950x700")
+        self.root.configure(bg=ModernColors.BG_PRIMARY)
+        self.root.minsize(800, 600)
         
-        # Detect and set system theme
-        system_theme = ThemeManager.get_system_theme()
-        self.is_dark_theme = system_theme == "dark"
-        self.current_theme = ThemeManager.DARK_THEME if self.is_dark_theme else ThemeManager.LIGHT_THEME
-        
-        # Set colors from theme
-        self.BG_COLOR = self.current_theme["BG_COLOR"]
-        self.FG_COLOR = self.current_theme["FG_COLOR"]
-        self.ACCENT_COLOR = self.current_theme["ACCENT_COLOR"]
-        self.ACCENT_HOVER = self.current_theme["ACCENT_HOVER"]
-        self.SUCCESS_COLOR = self.current_theme["SUCCESS_COLOR"]
-        self.DANGER_COLOR = self.current_theme["DANGER_COLOR"]
-        self.SECONDARY_BG = self.current_theme["SECONDARY_BG"]
-        self.BORDER_COLOR = self.current_theme["BORDER_COLOR"]
-        
-        # Apply theme to root
-        self.root.config(bg=self.BG_COLOR)
-        
-        # Style
-        self.style = ttk.Style()
-        self.style.theme_use('clam')
-        self._apply_theme_style()
-        
-        # --- Variables ---
+        # Variables
         self.src_image_path = None
         self.stego_image_object = None
         self.decoded_image_path = None
+        self.current_tab = 0
+        self.algo_var = tk.StringVar(value="LSB")
         
-        # --- Top Header with Theme Button ---
-        self.header_frame = tk.Frame(root, bg=self.SECONDARY_BG, height=40, highlightthickness=0)
-        self.header_frame.pack(fill="x", padx=0, pady=0)
-        self.header_frame.pack_propagate(False)
+        self._setup_ui()
+    
+    def _setup_ui(self):
+        """Setup the main UI."""
+        # Header
+        header = tk.Frame(self.root, bg=ModernColors.BG_SECONDARY, height=60)
+        header.pack(fill="x")
+        header.pack_propagate(False)
         
-        # Theme button on the right with rounded appearance
-        self.theme_btn = tk.Button(self.header_frame, text="🎨 Theme", command=self._show_theme_menu, 
-                                   bg=self.ACCENT_COLOR, fg=self.FG_COLOR, font=("Arial", 10, "bold"),
-                                   relief="flat", padx=20, pady=10, cursor="hand2",
-                                   borderwidth=0, highlightthickness=0)
-        self.theme_btn.pack(side="right", padx=15, pady=5)
-        self._apply_rounded_style(self.theme_btn)
+        # Logo/Title
+        title_frame = tk.Frame(header, bg=ModernColors.BG_SECONDARY)
+        title_frame.pack(side="left", padx=24, pady=12)
         
-        # --- Main Layout ---
-        self.notebook = ttk.Notebook(root)
-        self.notebook.pack(fill='both', expand=True, padx=10, pady=10)
+        tk.Label(title_frame, text="🔐", font=("Segoe UI", 18),
+                bg=ModernColors.BG_SECONDARY, fg=ModernColors.ACCENT_BLUE).pack(side="left")
+        tk.Label(title_frame, text="CyberMaths Stego", font=("Segoe UI Semibold", 16),
+                bg=ModernColors.BG_SECONDARY, fg=ModernColors.TEXT_PRIMARY).pack(side="left", padx=(8, 0))
         
-        # --- TABS ---
-        self.tab_encode = ttk.Frame(self.notebook)
-        self.tab_decode = ttk.Frame(self.notebook)
-        self.tab_analysis = ttk.Frame(self.notebook)
+        # Tab bar
+        tab_bar = tk.Frame(self.root, bg=ModernColors.BG_SECONDARY)
+        tab_bar.pack(fill="x")
         
-        self.notebook.add(self.tab_encode, text="  Encode (Hide)  ")
-        self.notebook.add(self.tab_decode, text="  Decode (Reveal)  ")
-        self.notebook.add(self.tab_analysis, text="  Maths Analysis  ")
+        self.tabs = []
+        tab_names = ["  🔒  Encode  ", "  🔓  Decode  ", "  📊  Analysis  "]
+        for i, name in enumerate(tab_names):
+            tab = ModernTab(tab_bar, name, is_active=(i == 0),
+                           command=lambda idx=i: self._switch_tab(idx))
+            tab.pack(side="left")
+            self.tabs.append(tab)
         
-        # Bind tab change event for smooth animation
-        self.notebook.bind("<<NotebookTabChanged>>", self._on_tab_changed)
-        self.animation_in_progress = False
+        # Separator
+        tk.Frame(self.root, bg=ModernColors.BORDER, height=1).pack(fill="x")
         
+        # Content area
+        self.content = tk.Frame(self.root, bg=ModernColors.BG_PRIMARY)
+        self.content.pack(fill="both", expand=True)
+        
+        # Tab frames
+        self.tab_frames = []
         self._setup_encode_tab()
         self._setup_decode_tab()
         self._setup_analysis_tab()
-        self._setup_theme_menu()
-
-    # ---------------------------------------------------------------------
-    # TAB ANIMATION
-    # ---------------------------------------------------------------------
-    
-    def _apply_rounded_style(self, widget):
-        """Apply visual rounded corner effect to widget."""
-        try:
-            # Add subtle border radius effect using relief and borderwidth
-            widget.config(relief="flat", borderwidth=0)
-        except:
-            pass
-    
-    def _on_tab_changed(self, event):
-        """Handle tab change event with smooth animation."""
-        if self.animation_in_progress:
-            return
         
-        self.animation_in_progress = True
-        self._slide_animation()
-        self.animation_in_progress = False
+        # Show first tab
+        self._switch_tab(0)
     
-    def _slide_animation(self):
-        """Create smooth slide and scale animation for tab transition."""
-        # Get current tab frame
-        current_tab = self.notebook.select()
-        try:
-            tab_frame = self.notebook.nametowidget(current_tab)
-            
-            # Store original geometry
-            original_padx = 10
-            original_pady = 10
-            
-            # Slide in animation (scale from 95% to 100%)
-            steps = 8
-            for step in range(steps):
-                scale = 0.95 + (0.05 * (step / steps))
-                time.sleep(0.015)  # ~15ms per frame
-                self.root.update_idletasks()
-            
-        except:
-            pass
-    
-    # ---------------------------------------------------------------------
-    # THEME MANAGEMENT
-    # ---------------------------------------------------------------------
-    
-    def _apply_theme_style(self):
-        """Apply current theme to all ttk widgets."""
-        self.style.configure("TNotebook", background=self.BG_COLOR, borderwidth=0)
-        self.style.configure("TNotebook.Tab", background=self.SECONDARY_BG, foreground=self.FG_COLOR, padding=[20, 10])
-        self.style.map("TNotebook.Tab", background=[("selected", self.ACCENT_COLOR)])
-        self.style.configure("TFrame", background=self.BG_COLOR)
-        self.style.configure("TLabel", background=self.BG_COLOR, foreground=self.FG_COLOR)
-        self.style.configure("TButton", background=self.ACCENT_COLOR, foreground=self.FG_COLOR, borderwidth=0, focuscolor='none')
-        self.style.map("TButton", background=[("active", self.ACCENT_HOVER), ("pressed", self.ACCENT_COLOR)])
-        self.style.configure("TEntry", fieldbackground=self.SECONDARY_BG, foreground=self.FG_COLOR, borderwidth=1, relief="solid")
-        self.style.configure("TRadiobutton", background=self.BG_COLOR, foreground=self.FG_COLOR)
-    
-    def _setup_theme_menu(self):
-        """Create theme selection popup menu."""
-        self.theme_menu = tk.Menu(self.root, tearoff=0, bg=self.SECONDARY_BG, fg=self.FG_COLOR, 
-                                  activebackground=self.ACCENT_COLOR, activeforeground=self.FG_COLOR,
-                                  font=("Arial", 10))
+    def _switch_tab(self, index):
+        """Switch to a different tab."""
+        self.current_tab = index
         
-        # Dark theme option with checkmark if currently selected
-        dark_label = "✓ 🌙 Dark Mode" if self.is_dark_theme else "  🌙 Dark Mode"
-        self.theme_menu.add_command(label=dark_label, command=lambda: self._update_theme_menu("dark"))
+        # Update tab buttons
+        for i, tab in enumerate(self.tabs):
+            tab.set_active(i == index)
         
-        # Light theme option with checkmark if currently selected
-        light_label = "✓ ☀️ Light Mode" if not self.is_dark_theme else "  ☀️ Light Mode"
-        self.theme_menu.add_command(label=light_label, command=lambda: self._update_theme_menu("light"))
-        
-        self.theme_menu.add_separator()
-        self.theme_menu.add_command(label="🖥️ System Default", command=lambda: self._update_theme_menu("system"))
+        # Show/hide tab frames
+        for i, frame in enumerate(self.tab_frames):
+            if i == index:
+                frame.pack(fill="both", expand=True)
+            else:
+                frame.pack_forget()
     
-    def _show_theme_menu(self):
-        """Show the theme popup menu."""
-        try:
-            self.theme_menu.tk_popup(self.theme_btn.winfo_rootx() + self.theme_btn.winfo_width(), 
-                                     self.theme_btn.winfo_rooty() + self.theme_btn.winfo_height())
-        except:
-            pass
-    
-    def _update_theme_menu(self, theme_choice):
-        """Update theme menu and apply selected theme."""
-        if theme_choice == "dark":
-            self.apply_theme("dark")
-        elif theme_choice == "light":
-            self.apply_theme("light")
-        elif theme_choice == "system":
-            self.apply_system_theme()
-    
-    def _refresh_theme_button(self):
-        """Refresh theme button styling with current theme colors."""
-        if hasattr(self, 'theme_btn'):
-            self.theme_btn.config(bg=self.ACCENT_COLOR, fg=self.FG_COLOR, activebackground=self.ACCENT_HOVER)
-    
-    def apply_theme(self, theme_name):
-        """Apply specified theme to the application."""
-        is_dark = theme_name == "dark"
-        
-        if is_dark == self.is_dark_theme:
-            return  # Already on this theme
-        
-        self.is_dark_theme = is_dark
-        self.current_theme = ThemeManager.DARK_THEME if is_dark else ThemeManager.LIGHT_THEME
-        
-        # Update all colors
-        self.BG_COLOR = self.current_theme["BG_COLOR"]
-        self.FG_COLOR = self.current_theme["FG_COLOR"]
-        self.ACCENT_COLOR = self.current_theme["ACCENT_COLOR"]
-        self.ACCENT_HOVER = self.current_theme["ACCENT_HOVER"]
-        self.SUCCESS_COLOR = self.current_theme["SUCCESS_COLOR"]
-        self.DANGER_COLOR = self.current_theme["DANGER_COLOR"]
-        self.SECONDARY_BG = self.current_theme["SECONDARY_BG"]
-        self.BORDER_COLOR = self.current_theme["BORDER_COLOR"]
-        
-        # Apply theme
-        self.root.config(bg=self.BG_COLOR)
-        self._apply_theme_style()
-        self._refresh_all_widgets()
-        self._refresh_theme_button()
-        self._setup_theme_menu()
-    
-    def apply_system_theme(self):
-        """Apply system theme preference."""
-        system_theme = ThemeManager.get_system_theme()
-        self.apply_theme(system_theme)
-    
-    def _refresh_all_widgets(self):
-        """Refresh all custom widgets with new theme colors."""
-        # Refresh header frame
-        if hasattr(self, 'header_frame'):
-            self.header_frame.config(bg=self.SECONDARY_BG)
-        
-        # Refresh text widgets if they exist
-        if hasattr(self, 'txt_msg'):
-            self.txt_msg.config(bg=self.SECONDARY_BG, fg=self.FG_COLOR, insertbackground=self.ACCENT_COLOR)
-        if hasattr(self, 'txt_output'):
-            self.txt_output.config(bg=self.SECONDARY_BG, fg=self.SUCCESS_COLOR, insertbackground=self.ACCENT_COLOR)
-        if hasattr(self, 'txt_exif'):
-            self.txt_exif.config(bg=self.SECONDARY_BG, fg=self.FG_COLOR, insertbackground=self.ACCENT_COLOR)
-        
-        # Refresh label widgets
-        if hasattr(self, 'lbl_img_preview_enc'):
-            self.lbl_img_preview_enc.config(bg=self.SECONDARY_BG, fg=self.FG_COLOR)
-        if hasattr(self, 'lbl_img_preview_dec'):
-            self.lbl_img_preview_dec.config(bg=self.SECONDARY_BG, fg=self.FG_COLOR)
-    
-    # ---------------------------------------------------------------------
-    # ENCODE TAB
-    # ---------------------------------------------------------------------
     def _setup_encode_tab(self):
-        # Left Panel: Image with rounded container
-        left_container = tk.Frame(self.tab_encode, bg=self.BG_COLOR)
-        left_container.pack(side="left", fill="both", expand=True, padx=10, pady=10)
+        """Setup the encode tab."""
+        frame = tk.Frame(self.content, bg=ModernColors.BG_PRIMARY)
+        self.tab_frames.append(frame)
         
-        left_frame = tk.Frame(left_container, bg=self.BG_COLOR, highlightbackground=self.BORDER_COLOR, 
-                             highlightthickness=1, highlightcolor=self.BORDER_COLOR)
-        left_frame.pack(fill="both", expand=True, padx=5, pady=5)
+        # Two column layout
+        left_col = tk.Frame(frame, bg=ModernColors.BG_PRIMARY)
+        left_col.pack(side="left", fill="both", expand=True, padx=(24, 12), pady=24)
         
-        lbl_instr = tk.Label(left_frame, text="1. Select Cover Image", font=("Arial", 12, "bold"),
-                            bg=self.BG_COLOR, fg=self.FG_COLOR)
-        lbl_instr.pack(anchor="w", padx=15, pady=(15, 10))
+        right_col = tk.Frame(frame, bg=ModernColors.BG_PRIMARY)
+        right_col.pack(side="right", fill="both", expand=True, padx=(12, 24), pady=24)
         
-        # Rounded button frame
-        btn_frame = tk.Frame(left_frame, bg=self.BG_COLOR)
-        btn_frame.pack(fill="x", padx=15, pady=5)
+        # Left column - Image
+        tk.Label(left_col, text="Cover Image", font=("Segoe UI Semibold", 13),
+                bg=ModernColors.BG_PRIMARY, fg=ModernColors.TEXT_PRIMARY,
+                anchor="w").pack(fill="x", pady=(0, 12))
         
-        self.btn_load_enc = tk.Button(btn_frame, text="📁 Load Image", command=self.load_image_encode,
-                                      bg=self.ACCENT_COLOR, fg=self.FG_COLOR, font=("Arial", 10, "bold"),
-                                      relief="flat", padx=20, pady=10, cursor="hand2", borderwidth=0)
-        self.btn_load_enc.pack(fill="x")
+        self.encode_dropzone = ModernImageDropzone(left_col, self._on_encode_image_load, self._on_encode_image_reset)
+        self.encode_dropzone.pack(fill="both", expand=True)
         
-        # Image preview with rounded border
-        preview_container = tk.Frame(left_frame, bg=self.SECONDARY_BG, highlightbackground=self.BORDER_COLOR,
-                                    highlightthickness=2)
-        preview_container.pack(fill="both", expand=True, padx=15, pady=(10, 15))
+        # Right column - Controls
+        msg_header = tk.Frame(right_col, bg=ModernColors.BG_PRIMARY)
+        msg_header.pack(fill="x", pady=(0, 8))
         
-        self.lbl_img_preview_enc = tk.Label(preview_container, text="No Image Selected", 
-                                           bg=self.SECONDARY_BG, fg=self.FG_COLOR, font=("Arial", 10))
-        self.lbl_img_preview_enc.pack(fill="both", expand=True, padx=2, pady=2)
-
-        # Right Panel: Controls with rounded container
-        right_container = tk.Frame(self.tab_encode, bg=self.BG_COLOR)
-        right_container.pack(side="right", fill="both", expand=True, padx=10, pady=10)
+        tk.Label(msg_header, text="Secret Message", font=("Segoe UI Semibold", 13),
+                bg=ModernColors.BG_PRIMARY, fg=ModernColors.TEXT_PRIMARY,
+                anchor="w").pack(side="left")
         
-        right_frame = tk.Frame(right_container, bg=self.BG_COLOR, highlightbackground=self.BORDER_COLOR,
-                              highlightthickness=1, highlightcolor=self.BORDER_COLOR)
-        right_frame.pack(fill="both", expand=True, padx=5, pady=5)
+        # Clear button for message
+        self.btn_clear_msg = ModernButton(msg_header, text="Clear", 
+                                         command=self._clear_message, 
+                                         variant="secondary",
+                                         width=80, height=28)
+        self.btn_clear_msg.pack(side="right")
         
-        tk.Label(right_frame, text="2. Secret Message", font=("Arial", 12, "bold"),
-                bg=self.BG_COLOR, fg=self.FG_COLOR).pack(anchor="w", padx=15, pady=(15, 5))
+        self.txt_msg = ModernText(right_col, height=5)
+        self.txt_msg.pack(fill="x", pady=(0, 16))
         
-        # Text area with rounded border
-        txt_container = tk.Frame(right_frame, bg=self.SECONDARY_BG, highlightbackground=self.BORDER_COLOR,
-                                highlightthickness=2)
-        txt_container.pack(fill="x", padx=15, pady=5)
+        # Password
+        tk.Label(right_col, text="Encryption Password (Optional)", 
+                font=("Segoe UI Semibold", 13),
+                bg=ModernColors.BG_PRIMARY, fg=ModernColors.TEXT_PRIMARY,
+                anchor="w").pack(fill="x", pady=(0, 8))
         
-        self.txt_msg = tk.Text(txt_container, height=5, bg=self.SECONDARY_BG, fg=self.FG_COLOR, 
-                              insertbackground=self.ACCENT_COLOR, relief="flat", borderwidth=0,
-                              font=("Arial", 10))
-        self.txt_msg.pack(fill="x", padx=3, pady=3)
+        self.entry_pass_enc = ModernEntry(right_col, show="•")
+        self.entry_pass_enc.pack(fill="x", pady=(0, 16))
         
-        tk.Label(right_frame, text="3. Security (Optional)", font=("Arial", 12, "bold"),
-                bg=self.BG_COLOR, fg=self.FG_COLOR).pack(anchor="w", padx=15, pady=(15, 5))
-        tk.Label(right_frame, text="Encryption Password:", bg=self.BG_COLOR, fg=self.FG_COLOR).pack(anchor="w", padx=15)
+        # Technique
+        tk.Label(right_col, text="Technique", font=("Segoe UI Semibold", 13),
+                bg=ModernColors.BG_PRIMARY, fg=ModernColors.TEXT_PRIMARY,
+                anchor="w").pack(fill="x", pady=(0, 8))
         
-        # Entry with rounded border
-        entry_container = tk.Frame(right_frame, bg=self.SECONDARY_BG, highlightbackground=self.BORDER_COLOR,
-                                  highlightthickness=2)
-        entry_container.pack(fill="x", padx=15, pady=(0, 10))
+        ModernRadioButton(right_col, "Standard LSB", self.algo_var, "LSB",
+                         "Basic least significant bit embedding").pack(fill="x")
+        ModernRadioButton(right_col, "LSB + XOR Encryption", self.algo_var, "XOR",
+                         "Enhanced security with password encryption").pack(fill="x")
         
-        self.entry_pass_enc = tk.Entry(entry_container, show="*", bg=self.SECONDARY_BG, fg=self.FG_COLOR,
-                                       relief="flat", borderwidth=0, font=("Arial", 10),
-                                       insertbackground=self.ACCENT_COLOR)
-        self.entry_pass_enc.pack(fill="x", padx=3, pady=5)
+        # Encode button
+        btn_frame = tk.Frame(right_col, bg=ModernColors.BG_PRIMARY)
+        btn_frame.pack(fill="x", pady=(24, 0))
         
-        tk.Label(right_frame, text="4. Technique", font=("Arial", 12, "bold"),
-                bg=self.BG_COLOR, fg=self.FG_COLOR).pack(anchor="w", padx=15, pady=(15, 5))
-        
-        self.algo_var = tk.StringVar(value="LSB")
-        
-        radio1 = tk.Radiobutton(right_frame, text="Standard LSB", variable=self.algo_var, value="LSB",
-                               bg=self.BG_COLOR, fg=self.FG_COLOR, selectcolor=self.SECONDARY_BG,
-                               activebackground=self.BG_COLOR, activeforeground=self.ACCENT_COLOR,
-                               font=("Arial", 10))
-        radio1.pack(anchor="w", padx=20)
-        
-        radio2 = tk.Radiobutton(right_frame, text="LSB + XOR Encryption", variable=self.algo_var, value="XOR",
-                               bg=self.BG_COLOR, fg=self.FG_COLOR, selectcolor=self.SECONDARY_BG,
-                               activebackground=self.BG_COLOR, activeforeground=self.ACCENT_COLOR,
-                               font=("Arial", 10))
-        radio2.pack(anchor="w", padx=20)
-        
-        # Encode button with rounded style
-        btn_encode_frame = tk.Frame(right_frame, bg=self.BG_COLOR)
-        btn_encode_frame.pack(fill="x", padx=15, pady=20)
-        
-        self.btn_encode = tk.Button(btn_encode_frame, text="🔐 ENCRYPT & SAVE IMAGE", command=self.process_encode,
-                                    bg=self.ACCENT_COLOR, fg=self.FG_COLOR, font=("Arial", 11, "bold"),
-                                    relief="flat", padx=20, pady=12, cursor="hand2", borderwidth=0)
+        self.btn_encode = ModernButton(btn_frame, text="🔐  Encrypt & Save Image",
+                                       command=self.process_encode, variant="gradient",
+                                       width=280, height=48)
         self.btn_encode.pack(fill="x")
-        
-    # ---------------------------------------------------------------------
-    # DECODE TAB
-    # ---------------------------------------------------------------------
-    # DECODE TAB
-    # ---------------------------------------------------------------------
+    
     def _setup_decode_tab(self):
-        container = tk.Frame(self.tab_decode, bg=self.BG_COLOR)
-        container.pack(fill="both", expand=True, padx=20, pady=20)
+        """Setup the decode tab."""
+        frame = tk.Frame(self.content, bg=ModernColors.BG_PRIMARY)
+        self.tab_frames.append(frame)
         
-        main_frame = tk.Frame(container, bg=self.BG_COLOR, highlightbackground=self.BORDER_COLOR,
-                             highlightthickness=1)
-        main_frame.pack(fill="both", expand=True, padx=5, pady=5)
+        # Center container
+        container = tk.Frame(frame, bg=ModernColors.BG_PRIMARY)
+        container.pack(fill="both", expand=True, padx=24, pady=24)
         
-        # Load button with rounded style
-        btn_frame = tk.Frame(main_frame, bg=self.BG_COLOR)
-        btn_frame.pack(fill="x", padx=15, pady=(15, 10))
+        # Image dropzone
+        tk.Label(container, text="Stego Image", font=("Segoe UI Semibold", 13),
+                bg=ModernColors.BG_PRIMARY, fg=ModernColors.TEXT_PRIMARY,
+                anchor="w").pack(fill="x", pady=(0, 12))
         
-        self.btn_load_dec = tk.Button(btn_frame, text="📁 Load Stego Image", command=self.load_image_decode,
-                                      bg=self.ACCENT_COLOR, fg=self.FG_COLOR, font=("Arial", 10, "bold"),
-                                      relief="flat", padx=20, pady=10, cursor="hand2", borderwidth=0)
-        self.btn_load_dec.pack(fill="x")
+        dropzone_frame = tk.Frame(container, bg=ModernColors.BG_PRIMARY)
+        dropzone_frame.pack(fill="x")
         
-        # Image preview with rounded border
-        preview_container = tk.Frame(main_frame, bg=self.SECONDARY_BG, highlightbackground=self.BORDER_COLOR,
-                                    highlightthickness=2)
-        preview_container.pack(fill="both", expand=True, padx=15, pady=10)
+        self.decode_dropzone = ModernImageDropzone(dropzone_frame, self._on_decode_image_load, self._on_decode_image_reset)
+        self.decode_dropzone.pack(fill="both", expand=True, pady=(0, 16))
         
-        self.lbl_img_preview_dec = tk.Label(preview_container, text="No Image Selected",
-                                           bg=self.SECONDARY_BG, fg=self.FG_COLOR, font=("Arial", 10))
-        self.lbl_img_preview_dec.pack(fill="both", expand=True, padx=2, pady=2)
+        # Password
+        tk.Label(container, text="Decryption Password (if encrypted)", 
+                font=("Segoe UI Semibold", 13),
+                bg=ModernColors.BG_PRIMARY, fg=ModernColors.TEXT_PRIMARY,
+                anchor="w").pack(fill="x", pady=(0, 8))
         
-        tk.Label(main_frame, text="Decryption Password (if used):", bg=self.BG_COLOR, fg=self.FG_COLOR,
-                font=("Arial", 10)).pack(anchor="w", padx=15, pady=(10, 5))
+        self.entry_pass_dec = ModernEntry(container, show="•")
+        self.entry_pass_dec.pack(fill="x", pady=(0, 16))
         
-        # Entry with rounded border
-        entry_container = tk.Frame(main_frame, bg=self.SECONDARY_BG, highlightbackground=self.BORDER_COLOR,
-                                  highlightthickness=2)
-        entry_container.pack(fill="x", padx=15, pady=5)
+        # Decode button
+        self.btn_decode = ModernButton(container, text="🔍  Reveal Hidden Message",
+                                       command=self.process_decode, variant="success",
+                                       width=280, height=48)
+        self.btn_decode.pack(pady=(0, 16))
         
-        self.entry_pass_dec = tk.Entry(entry_container, show="*", bg=self.SECONDARY_BG, fg=self.FG_COLOR,
-                                       relief="flat", borderwidth=0, font=("Arial", 10),
-                                       insertbackground=self.ACCENT_COLOR)
-        self.entry_pass_dec.pack(fill="x", padx=3, pady=5)
+        # Output
+        output_header = tk.Frame(container, bg=ModernColors.BG_PRIMARY)
+        output_header.pack(fill="x", pady=(0, 8))
         
-        # Decode button with rounded style
-        decode_btn_frame = tk.Frame(main_frame, bg=self.BG_COLOR)
-        decode_btn_frame.pack(fill="x", padx=15, pady=(15, 10))
+        tk.Label(output_header, text="Hidden Message", font=("Segoe UI Semibold", 13),
+                bg=ModernColors.BG_PRIMARY, fg=ModernColors.TEXT_PRIMARY,
+                anchor="w").pack(side="left")
         
-        self.btn_decode = tk.Button(decode_btn_frame, text="🔍 REVEAL HIDDEN MESSAGE", command=self.process_decode,
-                                    bg=self.SUCCESS_COLOR, fg="#FFFFFF", font=("Arial", 11, "bold"),
-                                    relief="flat", padx=20, pady=12, cursor="hand2", borderwidth=0)
-        self.btn_decode.pack(fill="x")
+        # Clear button for output
+        self.btn_clear_output = ModernButton(output_header, text="Clear", 
+                                           command=self._clear_output, 
+                                           variant="secondary",
+                                           width=80, height=28)
+        self.btn_clear_output.pack(side="right")
         
-        tk.Label(main_frame, text="Hidden Message:", bg=self.BG_COLOR, fg=self.FG_COLOR,
-                font=("Arial", 10, "bold")).pack(anchor="w", padx=15, pady=(10, 5))
-        
-        # Output text with rounded border
-        output_container = tk.Frame(main_frame, bg=self.SECONDARY_BG, highlightbackground=self.BORDER_COLOR,
-                                   highlightthickness=2)
-        output_container.pack(fill="x", padx=15, pady=(5, 15))
-        
-        self.txt_output = tk.Text(output_container, height=5, bg=self.SECONDARY_BG, fg=self.SUCCESS_COLOR,
-                                 insertbackground=self.ACCENT_COLOR, relief="flat", borderwidth=0,
-                                 font=("Arial", 10))
-        self.txt_output.pack(fill="x", padx=3, pady=3)
-
-    # ---------------------------------------------------------------------
-    # ANALYSIS TAB
-    # ---------------------------------------------------------------------
+        self.txt_output = ModernText(container, height=4)
+        self.txt_output.config(fg=ModernColors.ACCENT_GREEN)
+        self.txt_output.pack(fill="x")
+    
     def _setup_analysis_tab(self):
-        container = tk.Frame(self.tab_analysis, bg=self.BG_COLOR)
-        container.pack(fill="both", expand=True, padx=20, pady=20)
+        """Setup the analysis tab."""
+        frame = tk.Frame(self.content, bg=ModernColors.BG_PRIMARY)
+        self.tab_frames.append(frame)
         
-        main_frame = tk.Frame(container, bg=self.BG_COLOR, highlightbackground=self.BORDER_COLOR,
-                             highlightthickness=1)
-        main_frame.pack(fill="both", expand=True, padx=5, pady=5)
+        container = tk.Frame(frame, bg=ModernColors.BG_PRIMARY)
+        container.pack(fill="both", expand=True, padx=24, pady=24)
         
-        tk.Label(main_frame, text="Mathematical Analysis", font=("Arial", 14, "bold"),
-                bg=self.BG_COLOR, fg=self.FG_COLOR).pack(pady=(15, 10), padx=15)
+        # Title
+        tk.Label(container, text="Mathematical Analysis", 
+                font=("Segoe UI Semibold", 16),
+                bg=ModernColors.BG_PRIMARY, fg=ModernColors.TEXT_PRIMARY,
+                anchor="w").pack(fill="x", pady=(0, 8))
         
-        # Metrics Display with rounded container
-        metrics_container = tk.Frame(main_frame, bg=self.SECONDARY_BG, highlightbackground=self.BORDER_COLOR,
-                                    highlightthickness=2)
-        metrics_container.pack(fill="x", padx=15, pady=10)
+        tk.Label(container, text="Compare original and stego images to measure quality degradation",
+                font=("Segoe UI", 11),
+                bg=ModernColors.BG_PRIMARY, fg=ModernColors.TEXT_SECONDARY,
+                anchor="w").pack(fill="x", pady=(0, 20))
         
-        self.lbl_mse = tk.Label(metrics_container, text="MSE (Mean Squared Error): N/A", 
-                               font=("Courier", 11), bg=self.SECONDARY_BG, fg=self.FG_COLOR, anchor="w")
-        self.lbl_mse.pack(fill="x", padx=15, pady=(10, 5))
+        # Metrics cards
+        metrics_frame = tk.Frame(container, bg=ModernColors.BG_PRIMARY)
+        metrics_frame.pack(fill="x", pady=(0, 20))
         
-        self.lbl_psnr = tk.Label(metrics_container, text="PSNR (Signal-to-Noise Ratio): N/A",
-                                font=("Courier", 11), bg=self.SECONDARY_BG, fg=self.FG_COLOR, anchor="w")
-        self.lbl_psnr.pack(fill="x", padx=15, pady=(5, 10))
+        # MSE Card
+        mse_card = ModernCard(metrics_frame)
+        mse_card.pack(side="left", fill="both", expand=True, padx=(0, 8))
         
-        tk.Label(main_frame, text="EXIF / Metadata Reader:", font=("Arial", 10, "bold"),
-                bg=self.BG_COLOR, fg=self.FG_COLOR).pack(anchor="w", padx=15, pady=(15, 5))
+        mse_inner = tk.Frame(mse_card, bg=ModernColors.BG_CARD)
+        mse_inner.pack(fill="both", expand=True, padx=20, pady=16)
         
-        # EXIF text area with rounded border
-        exif_container = tk.Frame(main_frame, bg=self.SECONDARY_BG, highlightbackground=self.BORDER_COLOR,
-                                 highlightthickness=2)
-        exif_container.pack(fill="both", expand=True, padx=15, pady=5)
+        tk.Label(mse_inner, text="MSE", font=("Segoe UI", 10),
+                bg=ModernColors.BG_CARD, fg=ModernColors.TEXT_SECONDARY).pack(anchor="w")
+        self.lbl_mse = tk.Label(mse_inner, text="N/A", font=("Segoe UI Semibold", 18),
+                               bg=ModernColors.BG_CARD, fg=ModernColors.ACCENT_BLUE)
+        self.lbl_mse.pack(anchor="w", pady=(4, 0))
+        tk.Label(mse_inner, text="Mean Squared Error", font=("Segoe UI", 9),
+                bg=ModernColors.BG_CARD, fg=ModernColors.TEXT_MUTED).pack(anchor="w")
         
-        self.txt_exif = tk.Text(exif_container, height=10, bg=self.SECONDARY_BG, fg=self.FG_COLOR,
-                               insertbackground=self.ACCENT_COLOR, relief="flat", borderwidth=0,
-                               font=("Courier", 9))
-        self.txt_exif.pack(fill="both", expand=True, padx=3, pady=3)
+        # PSNR Card
+        psnr_card = ModernCard(metrics_frame)
+        psnr_card.pack(side="left", fill="both", expand=True, padx=(8, 0))
         
-        # Analysis button with rounded style
-        btn_frame = tk.Frame(main_frame, bg=self.BG_COLOR)
-        btn_frame.pack(fill="x", padx=15, pady=(15, 15))
+        psnr_inner = tk.Frame(psnr_card, bg=ModernColors.BG_CARD)
+        psnr_inner.pack(fill="both", expand=True, padx=20, pady=16)
         
-        self.btn_analysis = tk.Button(btn_frame, text="📊 Calculate Metrics", command=self.run_analysis,
-                                      bg=self.ACCENT_COLOR, fg=self.FG_COLOR, font=("Arial", 11, "bold"),
-                                      relief="flat", padx=20, pady=12, cursor="hand2", borderwidth=0)
-        self.btn_analysis.pack(fill="x")
-
-    # ---------------------------------------------------------------------
-    # HELPER FUNCTIONS
-    # ---------------------------------------------------------------------
+        tk.Label(psnr_inner, text="PSNR", font=("Segoe UI", 10),
+                bg=ModernColors.BG_CARD, fg=ModernColors.TEXT_SECONDARY).pack(anchor="w")
+        self.lbl_psnr = tk.Label(psnr_inner, text="N/A", font=("Segoe UI Semibold", 18),
+                                bg=ModernColors.BG_CARD, fg=ModernColors.ACCENT_GREEN)
+        self.lbl_psnr.pack(anchor="w", pady=(4, 0))
+        tk.Label(psnr_inner, text="Signal-to-Noise Ratio (dB)", font=("Segoe UI", 9),
+                bg=ModernColors.BG_CARD, fg=ModernColors.TEXT_MUTED).pack(anchor="w")
+        
+        # Calculate button
+        self.btn_analysis = ModernButton(container, text="📊  Calculate Metrics",
+                                        command=self.run_analysis, variant="primary",
+                                        width=200, height=44)
+        self.btn_analysis.pack(pady=(0, 20))
+        
+        # EXIF Data
+        tk.Label(container, text="Image Metadata (EXIF)", font=("Segoe UI Semibold", 13),
+                bg=ModernColors.BG_PRIMARY, fg=ModernColors.TEXT_PRIMARY,
+                anchor="w").pack(fill="x", pady=(0, 8))
+        
+        self.txt_exif = ModernText(container, height=10)
+        self.txt_exif.pack(fill="both", expand=True)
     
-    def _show_themed_message(self, title, message, msg_type="info"):
-        """Show a themed message dialog."""
-        dialog = tk.Toplevel(self.root)
-        dialog.title(title)
-        dialog.resizable(False, False)
-        dialog.configure(bg=self.BG_COLOR)
-        dialog.transient(self.root)
-        dialog.grab_set()
-        
-        # Icon and colors based on message type
-        if msg_type == "error":
-            icon = "❌"
-            accent = self.DANGER_COLOR
-        elif msg_type == "success":
-            icon = "✅"
-            accent = self.SUCCESS_COLOR
-        elif msg_type == "warning":
-            icon = "⚠️"
-            accent = "#FFA500"
-        else:  # info
-            icon = "ℹ️"
-            accent = self.ACCENT_COLOR
-        
-        # Main content frame
-        content_frame = tk.Frame(dialog, bg=self.BG_COLOR, highlightbackground=self.BORDER_COLOR,
-                                highlightthickness=1)
-        content_frame.pack(fill="both", expand=True, padx=15, pady=15)
-        
-        # Icon and title
-        header_frame = tk.Frame(content_frame, bg=self.BG_COLOR)
-        header_frame.pack(fill="x", padx=20, pady=(20, 10))
-        
-        tk.Label(header_frame, text=icon, font=("Arial", 24), bg=self.BG_COLOR, fg=accent).pack(side="left", padx=(0, 10))
-        tk.Label(header_frame, text=title, font=("Arial", 14, "bold"), bg=self.BG_COLOR, fg=self.FG_COLOR).pack(side="left")
-        
-        # Message
-        msg_label = tk.Label(content_frame, text=message, font=("Arial", 10), bg=self.BG_COLOR, fg=self.FG_COLOR,
-                           wraplength=340, justify="left")
-        msg_label.pack(fill="x", padx=20, pady=(10, 20))
-        
-        # OK button with fixed size
-        btn_frame = tk.Frame(content_frame, bg=self.BG_COLOR)
-        btn_frame.pack(fill="x", padx=20, pady=(0, 20))
-        
-        ok_btn = tk.Button(btn_frame, text="OK", command=dialog.destroy,
-                          bg=accent, fg="#FFFFFF", font=("Arial", 10, "bold"),
-                          relief="flat", padx=30, pady=8, cursor="hand2", borderwidth=0)
-        ok_btn.pack(side="right")
-        
-        # Update dialog to fit content and center
-        dialog.update_idletasks()
-        width = 420
-        height = 240  # Fixed height
-        x = (dialog.winfo_screenwidth() // 2) - (width // 2)
-        y = (dialog.winfo_screenheight() // 2) - (height // 2)
-        dialog.geometry(f"{width}x{height}+{x}+{y}")
-        
-        # Focus and wait
-        dialog.focus_set()
-        ok_btn.focus_set()
-        dialog.bind('<Return>', lambda e: dialog.destroy())
-        dialog.bind('<Escape>', lambda e: dialog.destroy())
-        dialog.wait_window()
+    # -------------------------------------------------------------------------
+    # EVENT HANDLERS
+    # -------------------------------------------------------------------------
     
-    def load_image_encode(self):
-        path = filedialog.askopenfilename(filetypes=[("Images", "*.png;*.jpg;*.jpeg;*.bmp")])
-        if path:
-            self.src_image_path = path
-            self._show_image(path, self.lbl_img_preview_enc)
-
-    def load_image_decode(self):
-        path = filedialog.askopenfilename(filetypes=[("Images", "*.png;*.bmp")]) # JPG destroys LSB
-        if path:
-            self.decoded_image_path = path
-            self._show_image(path, self.lbl_img_preview_dec)
-            
-            # Show EXIF immediately
-            exif_info = StegoEngine.get_exif_data(path)
-            self.txt_exif.delete(1.0, tk.END)
-            self.txt_exif.insert(tk.END, exif_info)
-
-    def _show_image(self, path, label_widget):
-        img = Image.open(path)
-        img.thumbnail((300, 300))
-        photo = ImageTk.PhotoImage(img)
-        label_widget.config(image=photo, text="")
-        label_widget.image = photo # Keep reference
-
+    def _on_encode_image_load(self, path):
+        """Handle image load for encoding."""
+        self.src_image_path = path
+    
+    def _on_encode_image_reset(self):
+        """Handle image reset for encoding."""
+        self.src_image_path = None
+    
+    def _on_decode_image_load(self, path):
+        """Handle image load for decoding."""
+        self.decoded_image_path = path
+        
+        # Show EXIF data
+        exif_info = StegoEngine.get_exif_data(path)
+        self.txt_exif.delete("1.0", tk.END)
+        self.txt_exif.insert("1.0", exif_info)
+    
+    def _on_decode_image_reset(self):
+        """Handle image reset for decoding."""
+        self.decoded_image_path = None
+        # Clear EXIF data when image is removed
+        self.txt_exif.delete("1.0", tk.END)
+    
     def process_encode(self):
+        """Process the encoding."""
         if not self.src_image_path:
-            self._show_themed_message("Error", "Please load an image first.", "error")
+            ModernModal(self.root, "Error", "Please select an image first.", "error")
             return
-            
+        
         msg = self.txt_msg.get("1.0", tk.END).strip()
         if not msg:
-            self._show_themed_message("Error", "Please enter a message.", "error")
+            ModernModal(self.root, "Error", "Please enter a secret message.", "error")
             return
-
-        password = self.entry_pass_enc.get() if self.algo_var.get() == "XOR" else None
+        
+        password = self.entry_pass_enc.get() if self.entry_pass_enc.get() else None
         
         try:
-            # Run the engine
             stego_img = StegoEngine.encode_lsb(self.src_image_path, msg, password)
-            self.stego_image_object = stego_img # Save in memory for analysis
+            self.stego_image_object = stego_img
             
-            save_path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG Image", "*.png")])
+            save_path = filedialog.asksaveasfilename(
+                defaultextension=".png",
+                filetypes=[("PNG Image", "*.png")]
+            )
+            
             if save_path:
                 stego_img.save(save_path)
-                self._show_themed_message("Success", f"Image saved successfully to:\n{save_path}", "success")
-                self.decoded_image_path = save_path # Auto-load for analysis
+                self.decoded_image_path = save_path
+                ModernModal(self.root, "Success", 
+                           f"Image saved successfully!\n\n{os.path.basename(save_path)}", 
+                           "success")
         except Exception as e:
-            self._show_themed_message("Error", str(e), "error")
-
+            ModernModal(self.root, "Error", str(e), "error")
+    
     def process_decode(self):
+        """Process the decoding."""
         if not self.decoded_image_path:
-            self._show_themed_message("Error", "Please load a Stego image.", "error")
+            ModernModal(self.root, "Error", "Please select a stego image first.", "error")
             return
-            
+        
         password = self.entry_pass_dec.get()
         
         try:
             msg = StegoEngine.decode_lsb(self.decoded_image_path, password)
-            self.txt_output.delete(1.0, tk.END)
-            self.txt_output.insert(tk.END, msg)
+            self.txt_output.delete("1.0", tk.END)
+            self.txt_output.insert("1.0", msg)
         except Exception as e:
-            self._show_themed_message("Error", str(e), "error")
-
+            ModernModal(self.root, "Error", str(e), "error")
+    
     def run_analysis(self):
+        """Run the mathematical analysis."""
         if not self.src_image_path or not self.decoded_image_path:
-            self._show_themed_message("Error", "Need both Original and Stego images loaded to compare.", "error")
+            ModernModal(self.root, "Error", 
+                       "Need both original and stego images loaded.\n\nEncode an image first, or load both images separately.", 
+                       "error")
             return
-            
+        
         try:
             orig = Image.open(self.src_image_path)
             stego = Image.open(self.decoded_image_path)
             
-            # Ensure size matches (in case user loaded wrong images)
             if orig.size != stego.size:
-                self._show_themed_message("Error", "Images must be same size for MSE/PSNR comparison.", "error")
+                ModernModal(self.root, "Error", 
+                           "Images must be the same size for comparison.", 
+                           "error")
                 return
             
             mse, psnr = StegoEngine.calculate_metrics(orig, stego)
             
-            self.lbl_mse.config(text=f"MSE: {mse:.4f} (Lower is better)")
-            self.lbl_psnr.config(text=f"PSNR: {psnr:.2f} dB (Higher is better)")
+            self.lbl_mse.config(text=f"{mse:.6f}")
+            psnr_text = f"{psnr:.2f} dB" if psnr != float('inf') else "∞ (Identical)"
+            self.lbl_psnr.config(text=psnr_text)
             
             if mse < 0.1:
-                self._show_themed_message("Analysis Complete", 
-                    "The images are mathematically almost identical!\nThis proves the steganography is invisible.", "success")
+                ModernModal(self.root, "Analysis Complete",
+                           "The images are mathematically almost identical!\n\nThis proves the steganography is virtually invisible to the human eye.",
+                           "success")
+            else:
+                ModernModal(self.root, "Analysis Complete",
+                           f"MSE: {mse:.6f}\nPSNR: {psnr_text}\n\nThe lower the MSE and higher the PSNR, the better the quality.",
+                           "info")
                 
         except Exception as e:
-            self._show_themed_message("Error", str(e), "error")
+            ModernModal(self.root, "Error", str(e), "error")
+    
+    # -------------------------------------------------------------------------
+    # RESET/CLEAR FUNCTIONS
+    # -------------------------------------------------------------------------
+    
+    def _clear_message(self):
+        """Clear the secret message text area."""
+        self.txt_msg.delete("1.0", tk.END)
+    
+    def _clear_output(self):
+        """Clear the output text area."""
+        self.txt_output.delete("1.0", tk.END)
+
+
+# -------------------------------------------------------------------------
+# ENTRY POINT
+# -------------------------------------------------------------------------
 
 if __name__ == "__main__":
     root = tk.Tk()
+    
+    # Set app icon (if available)
+    try:
+        if platform.system() == "Windows":
+            root.iconbitmap("icon.ico")
+    except:
+        pass
+    
     app = StegoApp(root)
     root.mainloop()
-

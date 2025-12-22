@@ -54,6 +54,11 @@
 
 ## Installation
 
+**Clone repository:**
+```
+git clone https://github.com/nadew-jayaweera/Image-Steganography.git
+```
+
 **Requirements** (tested with Python 3.9+):
 - Python 3.x
 - See `requirements.txt` for dependencies.
