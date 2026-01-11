@@ -1,1151 +1,1701 @@
 #!/usr/bin/env python3
 """
-CyberMaths Steganography Tool - Modern UI Edition
-A sleek, modern steganography application with dark theme.
+CyberMaths Steganography Tool - Mathematics Edition
+Standard LSB Steganography with comprehensive mathematical analysis.
 """
 
 import tkinter as tk
-from tkinter import ttk, filedialog
-from PIL import Image, ImageTk, ExifTags, ImageDraw # type: ignore
-import numpy as np # type: ignore
+from tkinter import filedialog, messagebox
 import math
 import os
 from datetime import datetime
 import platform
 
+# Check for required packages
+try:
+    from PIL import Image, ImageTk, ExifTags
+    import numpy as np
+except ImportError as e:
+    print("=" * 50)
+    print("Missing packages! Install with:")
+    print("  pip install Pillow numpy")
+    print("=" * 50)
+    raise e
+
+
 # -------------------------------------------------------------------------
-# BACKEND LOGIC (The Maths & Algorithms)
+# MATHEMATICS ENGINE
 # -------------------------------------------------------------------------
 
-class StegoEngine:
-    """
-    Handles the mathematical operations for image manipulation.
-    """
+class MathEngine:
+    """Mathematical calculations for image analysis."""
 
     @staticmethod
-    def to_binary(data):
-        """Convert any data (string or integers) to 8-bit binary format."""
-        if isinstance(data, str):
-            return ''.join([format(ord(i), "08b") for i in data])
-        elif isinstance(data, bytes) or isinstance(data, np.ndarray):
-            return [format(i, "08b") for i in data]
-        elif isinstance(data, int) or isinstance(data, np.uint8):
-            return format(data, "08b")
+    def calculate_entropy(image_path):
+        """
+        Calculate Shannon Entropy of an image.
+
+        Formula: H(X) = -Σ p(x) * log2(p(x))
+
+        Higher entropy = more randomness/information
+        Max entropy for 8-bit image = 8.0
+        """
+        img = Image.open(image_path).convert('L')  # Grayscale
+        histogram = img.histogram()
+        total_pixels = sum(histogram)
+
+        entropy = 0
+        for count in histogram:
+            if count > 0:
+                probability = count / total_pixels
+                entropy -= probability * math.log2(probability)
+
+        return entropy
+
+    @staticmethod
+    def calculate_statistics(image_path):
+        """
+        Calculate comprehensive image statistics.
+
+        Returns: mean, std_dev, variance, min, max, median
+        """
+        img = np.array(Image.open(image_path))
+
+        stats = {
+            'mean': np.mean(img),
+            'std_dev': np.std(img),
+            'variance': np.var(img),
+            'min': np.min(img),
+            'max': np.max(img),
+            'median': np.median(img),
+            'pixels': img.size,
+            'unique_values': len(np.unique(img))
+        }
+
+        return stats
+
+    @staticmethod
+    def calculate_histogram(image_path):
+        """
+        Calculate histogram data for visualization.
+        Returns histogram for each channel (R, G, B).
+        """
+        img = Image.open(image_path)
+
+        if img.mode == 'L':
+            return {'gray': img.histogram()}
+
+        img = img.convert('RGB')
+        r, g, b = img.split()
+
+        return {
+            'red': r.histogram(),
+            'green': g.histogram(),
+            'blue': b.histogram()
+        }
+
+    @staticmethod
+    def chi_square_test(image_path):
+        """
+        Chi-Square Steganalysis Test.
+
+        Detects LSB steganography by analyzing pixel pair distribution.
+
+        Formula: χ² = Σ (Oi - Ei)² / Ei
+
+        High χ² value = likely contains hidden data
+        """
+        img = np.array(Image.open(image_path).convert('L')).flatten()
+
+        # Count pairs of values (2i, 2i+1)
+        pairs = {}
+        for pixel in img:
+            pair_index = pixel // 2
+            if pair_index not in pairs:
+                pairs[pair_index] = [0, 0]
+            pairs[pair_index][pixel % 2] += 1
+
+        # Calculate chi-square
+        chi_square = 0
+        degrees_of_freedom = 0
+
+        for pair_index, counts in pairs.items():
+            expected = (counts[0] + counts[1]) / 2
+            if expected > 0:
+                chi_square += ((counts[0] - expected) ** 2) / expected
+                chi_square += ((counts[1] - expected) ** 2) / expected
+                degrees_of_freedom += 1
+
+        # Calculate p-value approximation
+        if degrees_of_freedom > 0:
+            # Simplified p-value estimation
+            z = (chi_square - degrees_of_freedom) / \
+                math.sqrt(2 * degrees_of_freedom)
+            p_value = 0.5 * (1 + math.erf(-z / math.sqrt(2)))
         else:
-            raise TypeError("Input type not supported")
+            p_value = 1.0
+
+        return chi_square, degrees_of_freedom, p_value
 
     @staticmethod
-    def calculate_metrics(original_img, stego_img):
+    def analyze_lsb_distribution(image_path):
         """
-        Calculates MSE and PSNR for the Maths Assessment.
+        Analyze the distribution of Least Significant Bits.
+
+        In a natural image, LSB should be roughly 50% zeros and 50% ones.
+        After steganography, this ratio may change.
         """
-        img1 = np.array(original_img).astype(np.float64)
-        img2 = np.array(stego_img).astype(np.float64)
+        img = np.array(Image.open(image_path)).flatten()
+
+        lsb_values = img & 1  # Extract LSB
+        zeros = np.sum(lsb_values == 0)
+        ones = np.sum(lsb_values == 1)
+        total = len(lsb_values)
+
+        return {
+            'zeros': zeros,
+            'ones': ones,
+            'total': total,
+            'zero_ratio': zeros / total,
+            'one_ratio': ones / total,
+            'balance': abs(0.5 - (zeros / total))  # 0 = perfectly balanced
+        }
+
+    @staticmethod
+    def calculate_ssim(img1_path, img2_path):
+        """
+        Calculate Structural Similarity Index (SSIM).
+
+        Formula: SSIM(x,y) = (2μxμy + C1)(2σxy + C2) / (μx² + μy² + C1)(σx² + σy² + C2)
+
+        SSIM ranges from -1 to 1, where 1 = identical images
+        """
+        img1 = np.array(Image.open(img1_path).convert('L')).astype(np.float64)
+        img2 = np.array(Image.open(img2_path).convert('L')).astype(np.float64)
+
+        if img1.shape != img2.shape:
+            raise ValueError("Images must have same dimensions")
+
+        # Constants
+        C1 = (0.01 * 255) ** 2
+        C2 = (0.03 * 255) ** 2
+
+        # Statistics
+        mu1 = np.mean(img1)
+        mu2 = np.mean(img2)
+        sigma1_sq = np.var(img1)
+        sigma2_sq = np.var(img2)
+        sigma12 = np.mean((img1 - mu1) * (img2 - mu2))
+
+        # SSIM formula
+        numerator = (2 * mu1 * mu2 + C1) * (2 * sigma12 + C2)
+        denominator = (mu1 ** 2 + mu2 ** 2 + C1) * (sigma1_sq + sigma2_sq + C2)
+
+        ssim = numerator / denominator
+
+        return ssim
+
+    @staticmethod
+    def calculate_correlation(img1_path, img2_path):
+        """
+        Calculate Pearson Correlation Coefficient.
+
+        Formula: r = Σ(xi - x̄)(yi - ȳ) / √[Σ(xi - x̄)² * Σ(yi - ȳ)²]
+
+        r = 1: Perfect positive correlation
+        r = 0: No correlation
+        r = -1: Perfect negative correlation
+        """
+        img1 = np.array(Image.open(img1_path).convert('L')
+                        ).flatten().astype(np.float64)
+        img2 = np.array(Image.open(img2_path).convert('L')
+                        ).flatten().astype(np.float64)
+
+        if len(img1) != len(img2):
+            raise ValueError("Images must have same size")
+
+        mean1, mean2 = np.mean(img1), np.mean(img2)
+
+        numerator = np.sum((img1 - mean1) * (img2 - mean2))
+        denominator = math.sqrt(
+            np.sum((img1 - mean1) ** 2) * np.sum((img2 - mean2) ** 2))
+
+        if denominator == 0:
+            return 1.0
+
+        return numerator / denominator
+
+    @staticmethod
+    def calculate_mse_psnr(img1_path, img2_path):
+        """
+        Calculate Mean Squared Error and Peak Signal-to-Noise Ratio.
+
+        MSE = (1/mn) * Σ Σ [I(i,j) - K(i,j)]²
+        PSNR = 10 * log10(MAX² / MSE) = 20 * log10(MAX / √MSE)
+
+        For 8-bit images, MAX = 255
+        """
+        img1 = np.array(Image.open(img1_path)).astype(np.float64)
+        img2 = np.array(Image.open(img2_path)).astype(np.float64)
 
         mse = np.mean((img1 - img2) ** 2)
 
         if mse == 0:
             return 0, float('inf')
 
-        max_pixel = 255.0
-        psnr = 20 * math.log10(max_pixel / math.sqrt(mse))
+        psnr = 20 * math.log10(255.0 / math.sqrt(mse))
 
         return mse, psnr
 
     @staticmethod
-    def xor_encrypt(message, key):
-        """
-        Simple XOR encryption (Maths Concept: Boolean Algebra).
-        """
-        if not key:
-            return message
-
-        encrypted = []
-        key_len = len(key)
-        for i, char in enumerate(message):
-            encrypted.append(chr(ord(char) ^ ord(key[i % key_len])))
-        return ''.join(encrypted)
+    def text_to_binary(text):
+        """Convert text to binary representation."""
+        result = []
+        for char in text:
+            binary = format(ord(char), '08b')
+            result.append((char, ord(char), binary))
+        return result
 
     @staticmethod
-    def encode_lsb(image_path, message, password=None):
-        """
-        Hides data in the Least Significant Bit of the image matrix.
-        """
+    def demonstrate_xor(text, key):
+        """Demonstrate XOR encryption step by step."""
+        if not key:
+            return []
+
+        result = []
+        for i, char in enumerate(text[:10]):  # Limit to 10 chars for display
+            key_char = key[i % len(key)]
+            char_bin = format(ord(char), '08b')
+            key_bin = format(ord(key_char), '08b')
+            xor_result = ord(char) ^ ord(key_char)
+            xor_bin = format(xor_result, '08b')
+
+            result.append({
+                'char': char,
+                'char_bin': char_bin,
+                'key_char': key_char,
+                'key_bin': key_bin,
+                'xor_result': chr(xor_result) if 32 <= xor_result <= 126 else '?',
+                'xor_bin': xor_bin
+            })
+
+        return result
+
+    @staticmethod
+    def calculate_capacity_details(image_path):
+        """Calculate detailed capacity information."""
+        img = Image.open(image_path)
+
+        width, height = img.size
+        channels = len(img.getbands())
+        total_pixels = width * height
+        total_subpixels = total_pixels * channels
+        max_bits = total_subpixels
+        max_bytes = max_bits // 8
+        max_chars = max_bytes - 10  # Reserve for delimiter
+
+        return {
+            'width': width,
+            'height': height,
+            'channels': channels,
+            'total_pixels': total_pixels,
+            'total_subpixels': total_subpixels,
+            'max_bits': max_bits,
+            'max_bytes': max_bytes,
+            'max_chars': max_chars,
+            'bits_per_pixel': channels
+        }
+
+
+# -------------------------------------------------------------------------
+# STEGANOGRAPHY ENGINE
+# -------------------------------------------------------------------------
+
+class StegoEngine:
+    """Standard LSB Steganography Engine."""
+
+    @staticmethod
+    def encode(image_path, message, password=None):
+        """Hide message using LSB method."""
         image = Image.open(image_path)
+        if image.mode not in ('RGB', 'RGBA'):
+            image = image.convert('RGB')
+
         img_array = np.array(image)
 
         if password:
-            message = StegoEngine.xor_encrypt(message, password)
+            message = StegoEngine._xor_cipher(message, password)
 
-        message += "$$STOP$$"
+        message += "<<END>>"
+        binary_message = ''.join(format(ord(char), '08b') for char in message)
+        msg_length = len(binary_message)
 
-        binary_message = StegoEngine.to_binary(message)
-        data_len = len(binary_message)
-
-        total_pixels = img_array.size
-        if data_len > total_pixels:
-            raise ValueError(f"Message too large. Need {data_len} bits, image has {total_pixels} pixels.")
+        if msg_length > img_array.size:
+            raise ValueError(
+                f"Message too large! Max: {img_array.size // 8} chars")
 
         flat_img = img_array.flatten()
 
-        for i in range(data_len):
-            flat_img[i] = flat_img[i] & 254
-            flat_img[i] = flat_img[i] | int(binary_message[i])
+        for i in range(msg_length):
+            flat_img[i] = (flat_img[i] & 0xFE) | int(binary_message[i])
 
-        stego_array = flat_img.reshape(img_array.shape)
-        stego_image = Image.fromarray(stego_array.astype('uint8'), image.mode)
-
-        return stego_image
+        result_array = flat_img.reshape(img_array.shape)
+        return Image.fromarray(result_array.astype('uint8'), image.mode)
 
     @staticmethod
-    def decode_lsb(image_path, password=None):
-        """
-        Extracts LSBs to reconstruct the message.
-        """
+    def decode(image_path, password=None):
+        """Extract hidden message using LSB method."""
         image = Image.open(image_path)
-        img_array = np.array(image)
-        flat_img = img_array.flatten()
+        flat_img = np.array(image).flatten()
 
         binary_data = ""
-        decoded_string = ""
+        message = ""
 
-        for i in range(len(flat_img)):
-            binary_data += str(flat_img[i] & 1)
+        for pixel in flat_img:
+            binary_data += str(pixel & 1)
 
-            if len(binary_data) >= 8:
-                char_code = int(binary_data[:8], 2)
-                char = chr(char_code)
-                decoded_string += char
-                binary_data = binary_data[8:]
+            if len(binary_data) == 8:
+                char_code = int(binary_data, 2)
+                binary_data = ""
 
-                if decoded_string.endswith("$$STOP$$"):
-                    final_msg = decoded_string[:-8]
-                    if password:
-                        return StegoEngine.xor_encrypt(final_msg, password)
-                    return final_msg
+                if char_code == 0:
+                    continue
 
-        return "No hidden message found or delimiter missing."
+                try:
+                    char = chr(char_code)
+                    message += char
+
+                    if message.endswith("<<END>>"):
+                        result = message[:-7]
+                        if password:
+                            result = StegoEngine._xor_cipher(result, password)
+                        return result
+                except:
+                    continue
+
+        return "No hidden message found."
 
     @staticmethod
-    def get_exif_data(image_path):
-        """
-        Extracts detailed metadata from the image.
-        """
+    def _xor_cipher(text, key):
+        """XOR encryption/decryption."""
+        if not key:
+            return text
+        return ''.join(chr(ord(c) ^ ord(key[i % len(key)])) for i, c in enumerate(text))
+
+    @staticmethod
+    def get_metadata(image_path):
+        """Extract image metadata."""
         try:
             img = Image.open(image_path)
             stats = os.stat(image_path)
-            info_list = []
 
-            info_list.append(f"{'File Name':<20}: {os.path.basename(image_path)}")
-            info_list.append(f"{'Directory':<20}: {os.path.dirname(image_path) or '.'}")
+            lines = [
+                f"{'Filename':<16}: {os.path.basename(image_path)}",
+                f"{'Size':<16}: {stats.st_size / 1024:.1f} KB",
+                f"{'Dimensions':<16}: {img.width} × {img.height} px",
+                f"{'Total Pixels':<16}: {img.width * img.height:,}",
+                f"{'Format':<16}: {img.format or 'Unknown'}",
+                f"{'Color Mode':<16}: {img.mode}",
+                f"{'Modified':<16}: {datetime.fromtimestamp(stats.st_mtime).strftime('%Y-%m-%d %H:%M')}",
+            ]
 
-            size_kb = stats.st_size / 1024
-            info_list.append(f"{'File Size':<20}: {size_kb:.1f} kB")
-
-            mod_time = datetime.fromtimestamp(stats.st_mtime).strftime('%Y:%m:%d %H:%M:%S')
-            acc_time = datetime.fromtimestamp(stats.st_atime).strftime('%Y:%m:%d %H:%M:%S')
-            info_list.append(f"{'File Mod Date':<20}: {mod_time}")
-            info_list.append(f"{'File Access Date':<20}: {acc_time}")
-
-            info_list.append(f"{'File Type':<20}: {img.format}")
-            info_list.append(f"{'MIME Type':<20}: {Image.MIME.get(img.format, 'image/' + img.format.lower())}")
-
-            info_list.append(f"{'Image Width':<20}: {img.width}")
-            info_list.append(f"{'Image Height':<20}: {img.height}")
-            info_list.append(f"{'Image Size':<20}: {img.width}x{img.height}")
-
-            mp = (img.width * img.height) / 1000000
-            info_list.append(f"{'Megapixels':<20}: {mp:.3f}")
-
-            bit_depth_map = {'1': 1, 'L': 8, 'P': 8, 'RGB': 8, 'RGBA': 8, 'CMYK': 8, 'YCbCr': 8, 'I': 32, 'F': 32}
-            bit_depth = bit_depth_map.get(img.mode, 'Unknown')
-            info_list.append(f"{'Bit Depth':<20}: {bit_depth}")
-            info_list.append(f"{'Color Type':<20}: {img.mode}")
-
-            info_list.append("─" * 45)
-
-            has_extra = False
-
-            if img.info:
-                for key, value in img.info.items():
-                    if key in ['dpi', 'transparency']:
-                        continue
-                    if isinstance(value, (str, int, float)):
-                        info_list.append(f"{key:<20}: {value}")
-                        has_extra = True
-
-            exif_data = img.getexif()
-            if exif_data:
-                for tag_id, value in exif_data.items():
-                    tag = ExifTags.TAGS.get(tag_id, tag_id)
-                    if isinstance(value, bytes):
-                        value = "<Binary>"
-                    info_list.append(f"{tag:<20}: {value}")
-                    has_extra = True
-
-            if not has_extra:
-                info_list.append("No additional internal metadata found.")
-
-            return "\n".join(info_list)
-
+            return "\n".join(lines)
         except Exception as e:
-            return f"Error reading metadata: {str(e)}"
+            return f"Error: {e}"
 
 
 # -------------------------------------------------------------------------
-# MODERN UI COMPONENTS
+# THEME
 # -------------------------------------------------------------------------
 
-class ModernColors:
-    """Modern color palette for dark theme."""
-    BG_PRIMARY = "#0f0f0f"
-    BG_SECONDARY = "#1a1a1a"
-    BG_TERTIARY = "#252525"
-    BG_CARD = "#1e1e1e"
+class Theme:
+    BG_DARK = "#09090b"
+    BG_MAIN = "#0c0c0e"
+    BG_SECONDARY = "#131316"
+    BG_CARD = "#18181b"
+    BG_HOVER = "#1f1f23"
+    BG_INPUT = "#1c1c20"
 
-    TEXT_PRIMARY = "#ffffff"
-    TEXT_SECONDARY = "#a0a0a0"
-    TEXT_MUTED = "#666666"
+    SIDEBAR = "#0a0a0c"
+    SIDEBAR_HOVER = "#151518"
+    SIDEBAR_ACTIVE = "#1a1a1e"
 
-    ACCENT_BLUE = "#3b82f6"
-    ACCENT_BLUE_HOVER = "#2563eb"
-    ACCENT_PURPLE = "#8b5cf6"
-    ACCENT_GREEN = "#10b981"
-    ACCENT_GREEN_HOVER = "#059669"
-    ACCENT_RED = "#ef4444"
-    ACCENT_RED_HOVER = "#dc2626"
-    ACCENT_ORANGE = "#f59e0b"
+    TEXT = "#fafafa"
+    TEXT_SEC = "#a1a1aa"
+    TEXT_MUTED = "#52525b"
 
-    BORDER = "#333333"
-    BORDER_LIGHT = "#404040"
+    BLUE = "#3b82f6"
+    BLUE_HOVER = "#2563eb"
+    GREEN = "#22c55e"
+    GREEN_HOVER = "#16a34a"
+    RED = "#ef4444"
+    PURPLE = "#a855f7"
+    ORANGE = "#f97316"
+    CYAN = "#06b6d4"
+    YELLOW = "#eab308"
 
-    GRADIENT_START = "#3b82f6"
-    GRADIENT_END = "#8b5cf6"
-#ye
+    BORDER = "#27272a"
+    BORDER_HOVER = "#3f3f46"
 
-class ModernButton(tk.Canvas):
-    """A modern styled button with gradient, hover effects, and rounded corners."""
+    FONT = "Segoe UI"
+    MONO = "Consolas"
 
-    def __init__(self, parent, text, command=None, variant="primary", width=200, height=44, **kwargs):
+
+# -------------------------------------------------------------------------
+# UI COMPONENTS
+# -------------------------------------------------------------------------
+
+class Button(tk.Canvas):
+    """Animated button."""
+
+    def __init__(self, parent, text="", command=None, style="primary",
+                 width=180, height=42, icon=None):
+
+        self.parent_bg = str(parent.cget('bg'))
         super().__init__(parent, width=width, height=height,
-                         bg=ModernColors.BG_PRIMARY, highlightthickness=0, **kwargs)
+                         bg=self.parent_bg, highlightthickness=0)
 
         self.text = text
         self.command = command
-        self.variant = variant
-        self.width = width
-        self.height = height
-        self.is_hovered = False
-        self.is_pressed = False
+        self.style = style
+        self.w = width
+        self.h = height
+        self.icon = icon
+        self.hover = 0.0
+        self.animating = False
 
-        self._set_colors()
+        self._setup_colors()
         self._draw()
 
-        self.bind("<Enter>", self._on_enter)
-        self.bind("<Leave>", self._on_leave)
-        self.bind("<Button-1>", self._on_press)
-        self.bind("<ButtonRelease-1>", self._on_release)
+        self.bind("<Enter>", self._enter)
+        self.bind("<Leave>", self._leave)
+        self.bind("<Button-1>", self._click)
 
-    def _set_colors(self):
-        """Set colors based on variant."""
-        if self.variant == "primary":
-            self.bg_color = ModernColors.ACCENT_BLUE
-            self.hover_color = ModernColors.ACCENT_BLUE_HOVER
-            self.text_color = "#ffffff"
-        elif self.variant == "success":
-            self.bg_color = ModernColors.ACCENT_GREEN
-            self.hover_color = ModernColors.ACCENT_GREEN_HOVER
-            self.text_color = "#ffffff"
-        elif self.variant == "danger":
-            self.bg_color = ModernColors.ACCENT_RED
-            self.hover_color = ModernColors.ACCENT_RED_HOVER
-            self.text_color = "#ffffff"
-        elif self.variant == "secondary":
-            self.bg_color = ModernColors.BG_TERTIARY
-            self.hover_color = ModernColors.BORDER_LIGHT
-            self.text_color = ModernColors.TEXT_PRIMARY
-        elif self.variant == "gradient":
-            self.bg_color = ModernColors.ACCENT_BLUE
-            self.hover_color = ModernColors.ACCENT_PURPLE
-            self.text_color = "#ffffff"
+    def _setup_colors(self):
+        styles = {
+            "primary": (Theme.BLUE, Theme.BLUE_HOVER, "#fff"),
+            "success": (Theme.GREEN, Theme.GREEN_HOVER, "#fff"),
+            "danger": (Theme.RED, "#dc2626", "#fff"),
+            "secondary": (Theme.BG_CARD, Theme.BG_HOVER, Theme.TEXT),
+            "ghost": (self.parent_bg, Theme.BG_HOVER, Theme.TEXT_SEC),
+            "purple": (Theme.PURPLE, "#9333ea", "#fff"),
+            "cyan": (Theme.CYAN, "#0891b2", "#fff"),
+        }
+        self.c1, self.c2, self.tc = styles.get(self.style, styles["primary"])
+
+    def _lerp_color(self, c1, c2, t):
+        if c1 == self.parent_bg:
+            c1 = Theme.BG_CARD
+        try:
+            r1, g1, b1 = int(c1[1:3], 16), int(c1[3:5], 16), int(c1[5:7], 16)
+            r2, g2, b2 = int(c2[1:3], 16), int(c2[3:5], 16), int(c2[5:7], 16)
+            r = int(r1 + (r2 - r1) * t)
+            g = int(g1 + (g2 - g1) * t)
+            b = int(b1 + (b2 - b1) * t)
+            return f'#{r:02x}{g:02x}{b:02x}'
+        except:
+            return c2 if t > 0.5 else c1
 
     def _draw(self):
-        """Draw the button."""
         self.delete("all")
+        color = self._lerp_color(self.c1, self.c2, self.hover)
 
-        color = self.hover_color if self.is_hovered else self.bg_color
-        if self.is_pressed:
-            color = self.hover_color
+        r = 8
+        pts = [r, 0, self.w-r, 0, self.w, 0, self.w, r, self.w, self.h-r,
+               self.w, self.h, self.w-r, self.h, r, self.h, 0, self.h,
+               0, self.h-r, 0, r, 0, 0]
+        self.create_polygon(pts, fill=color, smooth=True)
 
-        # Draw rounded rectangle
-        radius = 10
-        self._create_rounded_rect(2, 2, self.width - 2, self.height - 2, radius, color)
+        txt = f"{self.icon}  {self.text}" if self.icon else self.text
+        self.create_text(self.w//2, self.h//2, text=txt, fill=self.tc,
+                         font=(Theme.FONT, 10, "bold"))
 
-        # Draw text
-        self.create_text(self.width // 2, self.height // 2, text=self.text,
-                         fill=self.text_color, font=("Segoe UI Semibold", 11))
+    def _animate(self):
+        target = 1.0 if self.hovering else 0.0
+        if abs(self.hover - target) > 0.02:
+            self.hover += (target - self.hover) * 0.3
+            self._draw()
+            self.after(16, self._animate)
+        else:
+            self.hover = target
+            self._draw()
+            self.animating = False
 
-    def _create_rounded_rect(self, x1, y1, x2, y2, radius, color):
-        """Create a rounded rectangle."""
-        points = [
-            x1 + radius, y1,
-            x2 - radius, y1,
-            x2, y1,
-            x2, y1 + radius,
-            x2, y2 - radius,
-            x2, y2,
-            x2 - radius, y2,
-            x1 + radius, y2,
-            x1, y2,
-            x1, y2 - radius,
-            x1, y1 + radius,
-            x1, y1,
-        ]
-        self.create_polygon(points, fill=color, smooth=True)
-
-    def _on_enter(self, event):
-        self.is_hovered = True
+    def _enter(self, e):
         self.config(cursor="hand2")
-        self._draw()
+        self.hovering = True
+        if not self.animating:
+            self.animating = True
+            self._animate()
 
-    def _on_leave(self, event):
-        self.is_hovered = False
-        self.is_pressed = False
-        self._draw()
+    def _leave(self, e):
+        self.hovering = False
+        if not self.animating:
+            self.animating = True
+            self._animate()
 
-    def _on_press(self, event):
-        self.is_pressed = True
-        self._draw()
-
-    def _on_release(self, event):
-        self.is_pressed = False
-        self._draw()
-        if self.is_hovered and self.command:
+    def _click(self, e):
+        if self.command:
             self.command()
 
 
-class ModernEntry(tk.Frame):
-    """A modern styled entry field with rounded corners."""
+class Entry(tk.Frame):
+    def __init__(self, parent, placeholder="", show=None):
+        super().__init__(parent, bg=parent.cget('bg'))
 
-    def __init__(self, parent, placeholder="", show=None, **kwargs):
-        super().__init__(parent, bg=ModernColors.BG_PRIMARY)
+        self.border = tk.Frame(self, bg=Theme.BORDER)
+        self.border.pack(fill="x", ipady=1, ipadx=1)
 
-        self.placeholder = placeholder
-        self.show_char = show
-        self.has_focus = False
+        inner = tk.Frame(self.border, bg=Theme.BG_INPUT)
+        inner.pack(fill="x", padx=1, pady=1)
 
-        # Container with border
-        self.container = tk.Frame(self, bg=ModernColors.BORDER, padx=1, pady=1)
-        self.container.pack(fill="x")
+        self.entry = tk.Entry(inner, bg=Theme.BG_INPUT, fg=Theme.TEXT,
+                              insertbackground=Theme.BLUE, relief="flat",
+                              font=(Theme.FONT, 11), show=show or "")
+        self.entry.pack(fill="x", padx=14, pady=12)
 
-        self.inner = tk.Frame(self.container, bg=ModernColors.BG_TERTIARY)
-        self.inner.pack(fill="x", padx=1, pady=1)
-
-        self.entry = tk.Entry(self.inner, bg=ModernColors.BG_TERTIARY,
-                             fg=ModernColors.TEXT_PRIMARY,
-                             insertbackground=ModernColors.ACCENT_BLUE,
-                             relief="flat", font=("Segoe UI", 11),
-                             show=show if show else "")
-        self.entry.pack(fill="x", padx=12, pady=10)
-
-        self.entry.bind("<FocusIn>", self._on_focus_in)
-        self.entry.bind("<FocusOut>", self._on_focus_out)
-
-    def _on_focus_in(self, event):
-        self.has_focus = True
-        self.container.config(bg=ModernColors.ACCENT_BLUE)
-
-    def _on_focus_out(self, event):
-        self.has_focus = False
-        self.container.config(bg=ModernColors.BORDER)
+        self.entry.bind(
+            "<FocusIn>", lambda e: self.border.config(bg=Theme.BLUE))
+        self.entry.bind(
+            "<FocusOut>", lambda e: self.border.config(bg=Theme.BORDER))
 
     def get(self):
         return self.entry.get()
 
-    def delete(self, first, last):
-        self.entry.delete(first, last)
+    def delete(self, a, b):
+        self.entry.delete(a, b)
 
-    def insert(self, index, string):
-        self.entry.insert(index, string)
-
-
-class ModernText(tk.Frame):
-    """A modern styled text area with rounded corners."""
-
-    def __init__(self, parent, height=5, **kwargs):
-        super().__init__(parent, bg=ModernColors.BG_PRIMARY)
-
-        self.has_focus = False
-
-        # Container with border
-        self.container = tk.Frame(self, bg=ModernColors.BORDER, padx=1, pady=1)
-        self.container.pack(fill="both", expand=True)
-
-        self.inner = tk.Frame(self.container, bg=ModernColors.BG_TERTIARY)
-        self.inner.pack(fill="both", expand=True, padx=1, pady=1)
-
-        self.text = tk.Text(self.inner, bg=ModernColors.BG_TERTIARY,
-                           fg=ModernColors.TEXT_PRIMARY,
-                           insertbackground=ModernColors.ACCENT_BLUE,
-                           relief="flat", font=("Segoe UI", 11),
-                           height=height, wrap="word")
-        self.text.pack(fill="both", expand=True, padx=10, pady=10)
-
-        self.text.bind("<FocusIn>", self._on_focus_in)
-        self.text.bind("<FocusOut>", self._on_focus_out)
-
-    def _on_focus_in(self, event):
-        self.has_focus = True
-        self.container.config(bg=ModernColors.ACCENT_BLUE)
-
-    def _on_focus_out(self, event):
-        self.has_focus = False
-        self.container.config(bg=ModernColors.BORDER)
-
-    def get(self, start, end):
-        return self.text.get(start, end)
-
-    def delete(self, start, end):
-        self.text.delete(start, end)
-
-    def insert(self, index, chars):
-        self.text.insert(index, chars)
-
-    def config(self, **kwargs):
-        self.text.config(**kwargs)
+    def insert(self, i, s):
+        self.entry.insert(i, s)
 
 
-class ModernCard(tk.Frame):
-    """A modern card container with subtle border and shadow effect."""
+class TextArea(tk.Frame):
+    def __init__(self, parent, height=5):
+        super().__init__(parent, bg=parent.cget('bg'))
 
-    def __init__(self, parent, **kwargs):
-        super().__init__(parent, bg=ModernColors.BG_CARD, **kwargs)
+        self.border = tk.Frame(self, bg=Theme.BORDER)
+        self.border.pack(fill="both", expand=True, ipady=1, ipadx=1)
 
-        self.config(highlightbackground=ModernColors.BORDER,
-                   highlightthickness=1,
-                   highlightcolor=ModernColors.BORDER)
+        inner = tk.Frame(self.border, bg=Theme.BG_INPUT)
+        inner.pack(fill="both", expand=True, padx=1, pady=1)
 
+        # Scrollbar
+        scrollbar = tk.Scrollbar(
+            inner, bg=Theme.BG_INPUT, troughcolor=Theme.BG_INPUT)
+        scrollbar.pack(side="right", fill="y")
 
-class ModernRadioButton(tk.Frame):
-    """A modern styled radio button."""
+        self.text = tk.Text(inner, bg=Theme.BG_INPUT, fg=Theme.TEXT,
+                            insertbackground=Theme.BLUE, relief="flat",
+                            font=(Theme.MONO, 10), height=height, wrap="word",
+                            padx=12, pady=10, selectbackground=Theme.BLUE,
+                            selectforeground="#fff", highlightthickness=0,
+                            yscrollcommand=scrollbar.set)
+        self.text.pack(fill="both", expand=True, side="left")
+        scrollbar.config(command=self.text.yview)
 
-    def __init__(self, parent, text, variable, value, description="", **kwargs):
-        super().__init__(parent, bg=ModernColors.BG_PRIMARY, **kwargs)
+        self.text.bind(
+            "<FocusIn>", lambda e: self.border.config(bg=Theme.BLUE))
+        self.text.bind(
+            "<FocusOut>", lambda e: self.border.config(bg=Theme.BORDER))
 
-        self.variable = variable
-        self.value = value
-        self.is_selected = False
+    def get(self):
+        return self.text.get("1.0", "end-1c")
 
-        # Main container
-        self.container = tk.Frame(self, bg=ModernColors.BG_TERTIARY,
-                                 cursor="hand2")
-        self.container.pack(fill="x", pady=3)
+    def delete(self):
+        self.text.delete("1.0", "end")
 
-        # Radio circle
-        self.canvas = tk.Canvas(self.container, width=20, height=20,
-                               bg=ModernColors.BG_TERTIARY, highlightthickness=0)
-        self.canvas.pack(side="left", padx=(12, 8), pady=12)
+    def insert(self, txt):
+        self.text.insert("1.0", txt)
 
-        # Text container
-        text_frame = tk.Frame(self.container, bg=ModernColors.BG_TERTIARY)
-        text_frame.pack(side="left", fill="x", expand=True, pady=10)
-
-        self.label = tk.Label(text_frame, text=text, bg=ModernColors.BG_TERTIARY,
-                             fg=ModernColors.TEXT_PRIMARY, font=("Segoe UI Semibold", 10),
-                             anchor="w")
-        self.label.pack(fill="x")
-
-        if description:
-            self.desc_label = tk.Label(text_frame, text=description,
-                                       bg=ModernColors.BG_TERTIARY,
-                                       fg=ModernColors.TEXT_SECONDARY,
-                                       font=("Segoe UI", 9), anchor="w")
-            self.desc_label.pack(fill="x")
-
-        self._draw_radio()
-
-        # Bindings
-        for widget in [self.container, self.canvas, self.label, self]:
-            widget.bind("<Button-1>", self._on_click)
-            widget.bind("<Enter>", self._on_enter)
-            widget.bind("<Leave>", self._on_leave)
-
-        if hasattr(self, 'desc_label'):
-            self.desc_label.bind("<Button-1>", self._on_click)
-            self.desc_label.bind("<Enter>", self._on_enter)
-            self.desc_label.bind("<Leave>", self._on_leave)
-
-        # Track variable changes
-        self.variable.trace_add("write", lambda *args: self._draw_radio())
-
-    def _draw_radio(self):
-        """Draw the radio button circle."""
-        self.canvas.delete("all")
-        self.is_selected = self.variable.get() == self.value
-
-        # Outer circle
-        outer_color = ModernColors.ACCENT_BLUE if self.is_selected else ModernColors.BORDER_LIGHT
-        self.canvas.create_oval(2, 2, 18, 18, outline=outer_color, width=2)
-
-        # Inner circle (when selected)
-        if self.is_selected:
-            self.canvas.create_oval(6, 6, 14, 14, fill=ModernColors.ACCENT_BLUE, outline="")
-
-    def _on_click(self, event):
-        self.variable.set(self.value)
-
-    def _on_enter(self, event):
-        self.container.config(bg=ModernColors.BG_CARD)
-        self.canvas.config(bg=ModernColors.BG_CARD)
-        self.label.config(bg=ModernColors.BG_CARD)
-        if hasattr(self, 'desc_label'):
-            self.desc_label.config(bg=ModernColors.BG_CARD)
-
-    def _on_leave(self, event):
-        self.container.config(bg=ModernColors.BG_TERTIARY)
-        self.canvas.config(bg=ModernColors.BG_TERTIARY)
-        self.label.config(bg=ModernColors.BG_TERTIARY)
-        if hasattr(self, 'desc_label'):
-            self.desc_label.config(bg=ModernColors.BG_TERTIARY)
+    def bind_key(self, key, fn):
+        self.text.bind(key, fn)
 
 
-class ModernModal(tk.Toplevel):
-    """A modern styled modal dialog."""
-
-    def __init__(self, parent, title, message, modal_type="info"):
-        super().__init__(parent)
-
-        self.title("")
-        self.resizable(False, False)
-        self.configure(bg=ModernColors.BG_PRIMARY)
-        self.transient(parent)
-        self.grab_set()
-
-        # Icons and colors based on type
-        icons = {
-            "info": ("ℹ️", ModernColors.ACCENT_BLUE),
-            "success": ("✓", ModernColors.ACCENT_GREEN),
-            "error": ("✕", ModernColors.ACCENT_RED),
-            "warning": ("⚠", ModernColors.ACCENT_ORANGE)
-        }
-        icon, accent = icons.get(modal_type, icons["info"])
-
-        # Main container
-        main_frame = tk.Frame(self, bg=ModernColors.BG_SECONDARY,
-                             highlightbackground=ModernColors.BORDER,
-                             highlightthickness=1)
-        main_frame.pack(fill="both", expand=True, padx=0, pady=0)
-
-        # Header with icon
-        header = tk.Frame(main_frame, bg=ModernColors.BG_SECONDARY)
-        header.pack(fill="x", padx=24, pady=(24, 16))
-
-        # Icon circle
-        icon_canvas = tk.Canvas(header, width=48, height=48,
-                               bg=ModernColors.BG_SECONDARY, highlightthickness=0)
-        icon_canvas.pack(side="left", padx=(0, 16))
-        icon_canvas.create_oval(4, 4, 44, 44, fill=accent, outline="")
-        icon_canvas.create_text(24, 24, text=icon, fill="#ffffff",
-                               font=("Segoe UI", 16, "bold"))
-
-        # Title
-        tk.Label(header, text=title, bg=ModernColors.BG_SECONDARY,
-                fg=ModernColors.TEXT_PRIMARY, font=("Segoe UI Semibold", 14),
-                anchor="w").pack(side="left", fill="x", expand=True)
-
-        # Message
-        msg_label = tk.Label(main_frame, text=message, bg=ModernColors.BG_SECONDARY,
-                            fg=ModernColors.TEXT_SECONDARY, font=("Segoe UI", 11),
-                            wraplength=350, justify="left", anchor="w")
-        msg_label.pack(fill="x", padx=24, pady=(0, 24))
-
-        # Button container
-        btn_frame = tk.Frame(main_frame, bg=ModernColors.BG_SECONDARY)
-        btn_frame.pack(fill="x", padx=24, pady=(0, 24))
-
-        # Determine button variant based on modal type
-        btn_variant = "primary"
-        if modal_type == "success":
-            btn_variant = "success"
-        elif modal_type == "error":
-            btn_variant = "danger"
-
-        ok_btn = ModernButton(btn_frame, text="OK", command=self.destroy,
-                             variant=btn_variant, width=100, height=40)
-        ok_btn.pack(side="right")
-
-        # Center the modal
-        self.update_idletasks()
-        width = 420
-        height = self.winfo_reqheight()
-        x = parent.winfo_x() + (parent.winfo_width() // 2) - (width // 2)
-        y = parent.winfo_y() + (parent.winfo_height() // 2) - (height // 2)
-        self.geometry(f"{width}x{height}+{x}+{y}")
-
-        # Bindings
-        self.bind('<Return>', lambda e: self.destroy())
-        self.bind('<Escape>', lambda e: self.destroy())
-
-        self.focus_set()
-        self.wait_window()
+class Card(tk.Frame):
+    def __init__(self, parent):
+        super().__init__(parent, bg=Theme.BG_CARD,
+                         highlightbackground=Theme.BORDER, highlightthickness=1)
 
 
-class ModernImageDropzone(tk.Frame):
-    """A modern image dropzone with preview and reset functionality."""
+class Dropzone(tk.Frame):
+    def __init__(self, parent, on_load=None, on_reset=None):
+        super().__init__(parent, bg=parent.cget('bg'))
 
-    def __init__(self, parent, on_image_load=None, on_image_reset=None, **kwargs):
-        super().__init__(parent, bg=ModernColors.BG_PRIMARY, **kwargs)
-
-        self.on_image_load = on_image_load
-        self.on_image_reset = on_image_reset
+        self.on_load = on_load
+        self.on_reset = on_reset
         self.image_path = None
         self.photo = None
 
-        # Container with dashed border effect
-        self.container = tk.Frame(self, bg=ModernColors.BG_TERTIARY,
-                                 highlightbackground=ModernColors.BORDER,
-                                 highlightthickness=2)
-        self.container.pack(fill="both", expand=True, padx=2, pady=2)
+        self.border = tk.Frame(self, bg=Theme.BORDER)
+        self.border.pack(fill="both", expand=True)
 
-        # Content frame
-        self.content = tk.Frame(self.container, bg=ModernColors.BG_TERTIARY)
+        self.inner = tk.Frame(self.border, bg=Theme.BG_CARD)
+        self.inner.pack(fill="both", expand=True, padx=2, pady=2)
+
+        self.content = tk.Frame(self.inner, bg=Theme.BG_CARD)
         self.content.pack(fill="both", expand=True, padx=20, pady=20)
 
-        # Icon
-        self.icon_label = tk.Label(self.content, text="🖼️",
-                                   font=("Segoe UI", 36),
-                                   bg=ModernColors.BG_TERTIARY,
-                                   fg=ModernColors.TEXT_MUTED)
-        self.icon_label.pack(pady=(20, 10))
+        self.icon = tk.Label(self.content, text="🖼️", font=(Theme.FONT, 40),
+                             bg=Theme.BG_CARD, fg=Theme.TEXT_MUTED)
+        self.icon.pack(pady=(20, 8))
 
-        # Text
-        self.text_label = tk.Label(self.content, text="Click to select an image",
-                                   font=("Segoe UI", 11),
-                                   bg=ModernColors.BG_TERTIARY,
-                                   fg=ModernColors.TEXT_SECONDARY)
-        self.text_label.pack()
+        self.title = tk.Label(self.content, text="Click to select image",
+                              font=(Theme.FONT, 12, "bold"),
+                              bg=Theme.BG_CARD, fg=Theme.TEXT)
+        self.title.pack()
 
-        self.subtext_label = tk.Label(self.content, text="Supports PNG, JPG, BMP",
-                                      font=("Segoe UI", 9),
-                                      bg=ModernColors.BG_TERTIARY,
-                                      fg=ModernColors.TEXT_MUTED)
-        self.subtext_label.pack(pady=(5, 20))
+        self.subtitle = tk.Label(self.content, text="PNG, JPG, BMP",
+                                 font=(Theme.FONT, 10),
+                                 bg=Theme.BG_CARD, fg=Theme.TEXT_MUTED)
+        self.subtitle.pack(pady=(4, 20))
 
-        # Image preview label (hidden initially)
-        self.preview_label = tk.Label(self.content, bg=ModernColors.BG_TERTIARY)
+        self.preview = tk.Label(self.content, bg=Theme.BG_CARD)
+        self.info = tk.Label(self.content, bg=Theme.BG_CARD, fg=Theme.TEXT_SEC,
+                             font=(Theme.FONT, 9))
+        self.remove_btn = Button(self.content, "Remove", self.reset,
+                                 "danger", 100, 30, "✕")
 
-        # Reset button (hidden initially)
-        self.reset_btn = ModernButton(self.content, text="✕ Remove Image",
-                                     command=self.reset, variant="danger",
-                                     width=140, height=32)
+        for w in [self.inner, self.content, self.icon, self.title, self.subtitle]:
+            w.bind("<Button-1>", self._browse)
+            w.bind("<Enter>", lambda e: self.border.config(bg=Theme.BLUE))
+            w.bind("<Leave>", lambda e: self.border.config(bg=Theme.BORDER))
+            w.config(cursor="hand2")
 
-        # Bindings
-        for widget in [self, self.container, self.content, self.icon_label,
-                      self.text_label, self.subtext_label]:
-            widget.bind("<Button-1>", self._on_click)
-            widget.bind("<Enter>", self._on_enter)
-            widget.bind("<Leave>", self._on_leave)
-            widget.config(cursor="hand2")
-
-    def _on_click(self, event):
+    def _browse(self, e=None):
         path = filedialog.askopenfilename(
-            filetypes=[("Images", "*.png;*.jpg;*.jpeg;*.bmp")]
+            title="Select Image",
+            filetypes=[("Images", "*.png *.jpg *.jpeg *.bmp *.gif")]
         )
         if path:
-            self.load_image(path)
+            self._load(path)
 
-    def _on_enter(self, event):
-        self.container.config(highlightbackground=ModernColors.ACCENT_BLUE)
+    def _load(self, path):
+        try:
+            self.image_path = path
 
-    def _on_leave(self, event):
-        self.container.config(highlightbackground=ModernColors.BORDER)
+            self.icon.pack_forget()
+            self.title.pack_forget()
+            self.subtitle.pack_forget()
 
-    def load_image(self, path):
-        """Load and display an image."""
-        self.image_path = path
+            img = Image.open(path)
+            dims = f"{img.width} × {img.height}"
+            img.thumbnail((220, 220))
+            self.photo = ImageTk.PhotoImage(img)
 
-        # Hide dropzone text
-        self.icon_label.pack_forget()
-        self.text_label.pack_forget()
-        self.subtext_label.pack_forget()
+            self.preview.config(image=self.photo)
+            self.preview.pack(pady=(5, 0))
 
-        # Load and resize image
-        img = Image.open(path)
-        img.thumbnail((280, 280))
-        self.photo = ImageTk.PhotoImage(img)
+            size_kb = os.path.getsize(path) / 1024
+            name = os.path.basename(path)
+            if len(name) > 25:
+                name = name[:22] + "..."
+            self.info.config(text=f"{name}\n{dims}  •  {size_kb:.1f} KB")
+            self.info.pack(pady=(8, 0))
 
-        # Show preview
-        self.preview_label.config(image=self.photo)
-        self.preview_label.pack(fill="both", expand=True)
+            self.remove_btn.pack(pady=(8, 0))
 
-        # Show reset button
-        self.reset_btn.pack(pady=(10, 0))
-
-        # Callback
-        if self.on_image_load:
-            self.on_image_load(path)
+            if self.on_load:
+                self.on_load(path)
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not load image:\n{e}")
+            self.reset()
 
     def reset(self):
-        """Reset the dropzone."""
         self.image_path = None
         self.photo = None
-        self.preview_label.pack_forget()
-        self.reset_btn.pack_forget()
-        self.icon_label.pack(pady=(20, 10))
-        self.text_label.pack()
-        self.subtext_label.pack(pady=(5, 20))
 
-        # Callback for reset
-        if self.on_image_reset:
-            self.on_image_reset()
+        self.preview.pack_forget()
+        self.info.pack_forget()
+        self.remove_btn.pack_forget()
+
+        self.icon.pack(pady=(20, 8))
+        self.title.pack()
+        self.subtitle.pack(pady=(4, 20))
+
+        if self.on_reset:
+            self.on_reset()
 
 
-class ModernTab(tk.Frame):
-    """A modern tab button."""
+class NavItem(tk.Frame):
+    def __init__(self, parent, icon, text, active=False, command=None):
+        super().__init__(parent, bg=Theme.SIDEBAR, cursor="hand2")
 
-    def __init__(self, parent, text, is_active=False, command=None, **kwargs):
-        super().__init__(parent, bg=ModernColors.BG_SECONDARY, **kwargs)
-
-        self.text = text
-        self.is_active = is_active
+        self.active = active
         self.command = command
 
-        self.label = tk.Label(self, text=text, font=("Segoe UI Semibold", 11),
-                             bg=ModernColors.BG_SECONDARY,
-                             fg=ModernColors.TEXT_PRIMARY if is_active else ModernColors.TEXT_MUTED,
-                             padx=24, pady=12, cursor="hand2")
-        self.label.pack()
+        self.indicator = tk.Frame(self, width=3,
+                                  bg=Theme.BLUE if active else Theme.SIDEBAR)
+        self.indicator.pack(side="left", fill="y")
 
-        # Active indicator
-        self.indicator = tk.Frame(self, height=3,
-                                 bg=ModernColors.ACCENT_BLUE if is_active else ModernColors.BG_SECONDARY)
-        self.indicator.pack(fill="x")
+        bg = Theme.SIDEBAR_ACTIVE if active else Theme.SIDEBAR
+        self.content = tk.Frame(self, bg=bg)
+        self.content.pack(side="left", fill="both", expand=True)
 
-        self.label.bind("<Button-1>", self._on_click)
-        self.label.bind("<Enter>", self._on_enter)
-        self.label.bind("<Leave>", self._on_leave)
+        self.icon_lbl = tk.Label(self.content, text=icon, font=(Theme.FONT, 13),
+                                 bg=bg, fg=Theme.BLUE if active else Theme.TEXT_MUTED)
+        self.icon_lbl.pack(side="left", padx=(14, 8), pady=11)
 
-    def _on_click(self, event):
-        if self.command:
-            self.command()
+        self.text_lbl = tk.Label(self.content, text=text,
+                                 font=(Theme.FONT, 10, "bold"), bg=bg,
+                                 fg=Theme.TEXT if active else Theme.TEXT_SEC)
+        self.text_lbl.pack(side="left", pady=11)
 
-    def _on_enter(self, event):
-        if not self.is_active:
-            self.label.config(fg=ModernColors.TEXT_SECONDARY)
+        for w in [self, self.content, self.icon_lbl, self.text_lbl]:
+            w.bind("<Button-1>", lambda e: command() if command else None)
+            w.bind("<Enter>", self._enter)
+            w.bind("<Leave>", self._leave)
 
-    def _on_leave(self, event):
-        if not self.is_active:
-            self.label.config(fg=ModernColors.TEXT_MUTED)
+    def _enter(self, e):
+        if not self.active:
+            self._set_bg(Theme.SIDEBAR_HOVER)
+
+    def _leave(self, e):
+        if not self.active:
+            self._set_bg(Theme.SIDEBAR)
+
+    def _set_bg(self, bg):
+        self.content.config(bg=bg)
+        self.icon_lbl.config(bg=bg)
+        self.text_lbl.config(bg=bg)
 
     def set_active(self, active):
-        self.is_active = active
-        self.label.config(fg=ModernColors.TEXT_PRIMARY if active else ModernColors.TEXT_MUTED)
-        self.indicator.config(bg=ModernColors.ACCENT_BLUE if active else ModernColors.BG_SECONDARY)
+        self.active = active
+        bg = Theme.SIDEBAR_ACTIVE if active else Theme.SIDEBAR
+        self.indicator.config(bg=Theme.BLUE if active else Theme.SIDEBAR)
+        self._set_bg(bg)
+        self.icon_lbl.config(fg=Theme.BLUE if active else Theme.TEXT_MUTED)
+        self.text_lbl.config(fg=Theme.TEXT if active else Theme.TEXT_SEC)
+
+
+class MetricCard(tk.Frame):
+    def __init__(self, parent, icon, title, color=Theme.BLUE):
+        super().__init__(parent, bg=Theme.BG_CARD,
+                         highlightbackground=Theme.BORDER, highlightthickness=1)
+
+        c = tk.Frame(self, bg=Theme.BG_CARD)
+        c.pack(fill="both", expand=True, padx=14, pady=10)
+
+        header = tk.Frame(c, bg=Theme.BG_CARD)
+        header.pack(fill="x")
+
+        tk.Label(header, text=icon, font=(Theme.FONT, 14),
+                 bg=Theme.BG_CARD, fg=color).pack(side="left")
+        tk.Label(header, text=title, font=(Theme.FONT, 9),
+                 bg=Theme.BG_CARD, fg=Theme.TEXT_MUTED).pack(side="left", padx=(6, 0))
+
+        self.value = tk.Label(c, text="--", font=(Theme.FONT, 18, "bold"),
+                              bg=Theme.BG_CARD, fg=color)
+        self.value.pack(anchor="w", pady=(6, 0))
+
+    def set(self, val):
+        self.value.config(text=val)
+
+
+class ProgressBar(tk.Canvas):
+    def __init__(self, parent, width=200, height=4):
+        super().__init__(parent, width=width, height=height,
+                         bg=Theme.BG_CARD, highlightthickness=0)
+        self.w = width
+        self.h = height
+        self.progress = 0
+        self._draw()
+
+    def _draw(self):
+        self.delete("all")
+        self.create_rectangle(0, 0, self.w, self.h,
+                              fill=Theme.BG_HOVER, outline="")
+        if self.progress > 0:
+            pw = (self.progress / 100) * self.w
+            self.create_rectangle(
+                0, 0, pw, self.h, fill=Theme.BLUE, outline="")
+
+    def set(self, val):
+        self.progress = max(0, min(100, val))
+        self._draw()
+
+
+class HistogramCanvas(tk.Canvas):
+    """Canvas for drawing histograms."""
+
+    def __init__(self, parent, width=300, height=150):
+        super().__init__(parent, width=width, height=height,
+                         bg=Theme.BG_CARD, highlightthickness=0)
+        self.w = width
+        self.h = height
+
+    def draw_histogram(self, histogram_data, color=Theme.BLUE):
+        self.delete("all")
+
+        if not histogram_data:
+            self.create_text(self.w//2, self.h//2, text="No data",
+                             fill=Theme.TEXT_MUTED, font=(Theme.FONT, 10))
+            return
+
+        # Normalize data
+        max_val = max(histogram_data) if max(histogram_data) > 0 else 1
+        bar_width = self.w / 256
+
+        for i, val in enumerate(histogram_data):
+            if val > 0:
+                bar_height = (val / max_val) * (self.h - 20)
+                x = i * bar_width
+                self.create_rectangle(
+                    x, self.h - bar_height,
+                    x + bar_width, self.h,
+                    fill=color, outline=""
+                )
+
+        # Axis labels
+        self.create_text(10, 10, text="Frequency", anchor="nw",
+                         fill=Theme.TEXT_MUTED, font=(Theme.FONT, 8))
+        self.create_text(self.w - 10, self.h - 5, text="Pixel Value (0-255)", anchor="se",
+                         fill=Theme.TEXT_MUTED, font=(Theme.FONT, 8))
 
 
 # -------------------------------------------------------------------------
 # MAIN APPLICATION
 # -------------------------------------------------------------------------
 
-class StegoApp:
+class App:
     def __init__(self, root):
         self.root = root
-        self.root.title("CyberMaths Steganography Tool")
-        self.root.geometry("950x700")
-        self.root.configure(bg=ModernColors.BG_PRIMARY)
-        self.root.minsize(800, 600)
+        self.root.title("CyberMaths Steganography")
+        self.root.geometry("1200x800")
+        self.root.configure(bg=Theme.BG_DARK)
+        self.root.minsize(1000, 700)
 
-        # Variables
-        self.src_image_path = None
-        self.stego_image_object = None
-        self.decoded_image_path = None
+        self.src_path = None
+        self.stego_path = None
         self.current_tab = 0
-        self.algo_var = tk.StringVar(value="LSB")
 
-        self._setup_ui()
+        self._build()
 
-    def _setup_ui(self):
-        """Setup the main UI."""
-        # Header
-        header = tk.Frame(self.root, bg=ModernColors.BG_SECONDARY, height=60)
-        header.pack(fill="x")
-        header.pack_propagate(False)
+    def _build(self):
+        main = tk.Frame(self.root, bg=Theme.BG_DARK)
+        main.pack(fill="both", expand=True)
 
-        # Logo/Title
-        title_frame = tk.Frame(header, bg=ModernColors.BG_SECONDARY)
-        title_frame.pack(side="left", padx=24, pady=12)
+        self._sidebar(main)
 
-        tk.Label(title_frame, text="🔐", font=("Segoe UI", 18),
-                bg=ModernColors.BG_SECONDARY, fg=ModernColors.ACCENT_BLUE).pack(side="left")
-        tk.Label(title_frame, text="CyberMaths Stego", font=("Segoe UI Semibold", 16),
-                bg=ModernColors.BG_SECONDARY, fg=ModernColors.TEXT_PRIMARY).pack(side="left", padx=(8, 0))
+        self.main_area = tk.Frame(main, bg=Theme.BG_MAIN)
+        self.main_area.pack(side="left", fill="both", expand=True)
 
-        # Tab bar
-        tab_bar = tk.Frame(self.root, bg=ModernColors.BG_SECONDARY)
-        tab_bar.pack(fill="x")
+        self._header()
 
-        self.tabs = []
-        tab_names = ["  🔒  Encode  ", "  🔓  Decode  ", "  📊  Analysis  "]
-        for i, name in enumerate(tab_names):
-            tab = ModernTab(tab_bar, name, is_active=(i == 0),
-                           command=lambda idx=i: self._switch_tab(idx))
-            tab.pack(side="left")
-            self.tabs.append(tab)
-
-        # Separator
-        tk.Frame(self.root, bg=ModernColors.BORDER, height=1).pack(fill="x")
-
-        # Content area
-        self.content = tk.Frame(self.root, bg=ModernColors.BG_PRIMARY)
+        self.content = tk.Frame(self.main_area, bg=Theme.BG_MAIN)
         self.content.pack(fill="both", expand=True)
 
-        # Tab frames
-        self.tab_frames = []
-        self._setup_encode_tab()
-        self._setup_decode_tab()
-        self._setup_analysis_tab()
+        self.tabs = []
+        self._encode_tab()
+        self._decode_tab()
+        self._analysis_tab()
+        self._math_tab()
 
-        # Show first tab
-        self._switch_tab(0)
+        self._statusbar()
+        self._switch(0)
 
-    def _setup_encode_tab(self):
-        """Setup the encode tab."""
-        frame = tk.Frame(self.content, bg=ModernColors.BG_PRIMARY)
-        self.tab_frames.append(frame)
+    def _sidebar(self, parent):
+        sb = tk.Frame(parent, bg=Theme.SIDEBAR, width=200)
+        sb.pack(side="left", fill="y")
+        sb.pack_propagate(False)
 
-        # Two column layout
-        left_col = tk.Frame(frame, bg=ModernColors.BG_PRIMARY)
-        left_col.pack(side="left", fill="both", expand=True, padx=(24, 12), pady=24)
+        # Logo
+        logo = tk.Frame(sb, bg=Theme.SIDEBAR)
+        logo.pack(fill="x", pady=(20, 24))
 
-        right_col = tk.Frame(frame, bg=ModernColors.BG_PRIMARY)
-        right_col.pack(side="right", fill="both", expand=True, padx=(12, 24), pady=24)
+        canvas = tk.Canvas(logo, width=44, height=44, bg=Theme.SIDEBAR,
+                           highlightthickness=0)
+        canvas.pack()
+        canvas.create_oval(4, 4, 40, 40, fill=Theme.BLUE, outline="")
+        canvas.create_text(22, 22, text="∑", font=(
+            Theme.FONT, 16, "bold"), fill="#fff")
 
-        # Left column - Image
-        tk.Label(left_col, text="Cover Image", font=("Segoe UI Semibold", 13),
-                bg=ModernColors.BG_PRIMARY, fg=ModernColors.TEXT_PRIMARY,
-                anchor="w").pack(fill="x", pady=(0, 12))
+        tk.Label(logo, text="CyberMaths", font=(Theme.FONT, 14, "bold"),
+                 bg=Theme.SIDEBAR, fg=Theme.TEXT).pack(pady=(6, 0))
+        tk.Label(logo, text="Steganography", font=(Theme.FONT, 9),
+                 bg=Theme.SIDEBAR, fg=Theme.TEXT_MUTED).pack()
 
-        self.encode_dropzone = ModernImageDropzone(left_col, self._on_encode_image_load, self._on_encode_image_reset)
-        self.encode_dropzone.pack(fill="both", expand=True)
+        tk.Frame(sb, bg=Theme.BORDER, height=1).pack(fill="x", padx=14, pady=6)
 
-        # Right column - Controls
-        msg_header = tk.Frame(right_col, bg=ModernColors.BG_PRIMARY)
-        msg_header.pack(fill="x", pady=(0, 8))
+        # Nav
+        tk.Label(sb, text="MAIN", font=(Theme.FONT, 8, "bold"),
+                 bg=Theme.SIDEBAR, fg=Theme.TEXT_MUTED).pack(anchor="w", padx=14, pady=(10, 6))
 
-        tk.Label(msg_header, text="Secret Message", font=("Segoe UI Semibold", 13),
-                bg=ModernColors.BG_PRIMARY, fg=ModernColors.TEXT_PRIMARY,
-                anchor="w").pack(side="left")
+        self.nav = []
+        items = [
+            ("🔒", "Encode"),
+            ("🔓", "Decode"),
+            ("📊", "Analysis"),
+            ("📐", "Mathematics")
+        ]
+        for i, (icon, text) in enumerate(items):
+            item = NavItem(sb, icon, text, i == 0,
+                           lambda idx=i: self._switch(idx))
+            item.pack(fill="x")
+            self.nav.append(item)
 
-        # Clear button for message
-        self.btn_clear_msg = ModernButton(msg_header, text="Clear",
-                                         command=self._clear_message,
-                                         variant="secondary",
-                                         width=80, height=28)
-        self.btn_clear_msg.pack(side="right")
+        tk.Frame(sb, bg=Theme.BORDER, height=1).pack(
+            fill="x", padx=14, pady=10)
 
-        self.txt_msg = ModernText(right_col, height=5)
-        self.txt_msg.pack(fill="x", pady=(0, 16))
+        # Formulas section
+        tk.Label(sb, text="KEY FORMULAS", font=(Theme.FONT, 8, "bold"),
+                 bg=Theme.SIDEBAR, fg=Theme.TEXT_MUTED).pack(anchor="w", padx=14, pady=(4, 6))
+
+        formulas = [
+            ("MSE", "Σ(I-K)²/mn"),
+            ("PSNR", "20·log₁₀(MAX/√MSE)"),
+            ("Entropy", "-Σp·log₂(p)"),
+            ("XOR", "A ⊕ B"),
+        ]
+
+        for name, formula in formulas:
+            row = tk.Frame(sb, bg=Theme.SIDEBAR)
+            row.pack(fill="x", padx=14, pady=2)
+            tk.Label(row, text=name, font=(Theme.MONO, 8),
+                     bg=Theme.SIDEBAR, fg=Theme.TEXT_MUTED, width=8, anchor="w").pack(side="left")
+            tk.Label(row, text=formula, font=(Theme.MONO, 8),
+                     bg=Theme.SIDEBAR, fg=Theme.CYAN).pack(side="left")
+
+        # Version
+        tk.Label(sb, text="v3.0 Math Edition", font=(Theme.FONT, 8),
+                 bg=Theme.SIDEBAR, fg=Theme.TEXT_MUTED).pack(side="bottom", pady=14)
+
+    def _header(self):
+        hdr = tk.Frame(self.main_area, bg=Theme.BG_SECONDARY, height=52)
+        hdr.pack(fill="x")
+        hdr.pack_propagate(False)
+
+        self.title = tk.Label(hdr, text="🔒  Encode Message",
+                              font=(Theme.FONT, 13, "bold"),
+                              bg=Theme.BG_SECONDARY, fg=Theme.TEXT)
+        self.title.pack(side="left", padx=18, pady=14)
+
+        tk.Frame(self.main_area, bg=Theme.BORDER, height=1).pack(fill="x")
+
+    def _statusbar(self):
+        tk.Frame(self.main_area, bg=Theme.BORDER,
+                 height=1).pack(side="bottom", fill="x")
+
+        bar = tk.Frame(self.main_area, bg=Theme.BG_SECONDARY, height=26)
+        bar.pack(side="bottom", fill="x")
+        bar.pack_propagate(False)
+
+        self.status = tk.Label(bar, text="Ready", font=(Theme.FONT, 9),
+                               bg=Theme.BG_SECONDARY, fg=Theme.TEXT_MUTED)
+        self.status.pack(side="left", padx=14, pady=5)
+
+    def _encode_tab(self):
+        frame = tk.Frame(self.content, bg=Theme.BG_MAIN)
+        self.tabs.append(frame)
+
+        container = tk.Frame(frame, bg=Theme.BG_MAIN)
+        container.pack(fill="both", expand=True, padx=18, pady=18)
+
+        # Left
+        left = tk.Frame(container, bg=Theme.BG_MAIN)
+        left.pack(side="left", fill="both", expand=True, padx=(0, 9))
+
+        card1 = Card(left)
+        card1.pack(fill="both", expand=True)
+
+        c1 = tk.Frame(card1, bg=Theme.BG_CARD)
+        c1.pack(fill="both", expand=True, padx=14, pady=14)
+
+        tk.Label(c1, text="📁  Cover Image", font=(Theme.FONT, 11, "bold"),
+                 bg=Theme.BG_CARD, fg=Theme.TEXT).pack(anchor="w", pady=(0, 10))
+
+        self.enc_drop = Dropzone(c1, self._enc_load, self._enc_reset)
+        self.enc_drop.pack(fill="both", expand=True)
+
+        # Capacity
+        cap_frame = tk.Frame(c1, bg=Theme.BG_CARD)
+        cap_frame.pack(fill="x", pady=(10, 0))
+
+        cap_hdr = tk.Frame(cap_frame, bg=Theme.BG_CARD)
+        cap_hdr.pack(fill="x")
+
+        tk.Label(cap_hdr, text="Capacity", font=(Theme.FONT, 9),
+                 bg=Theme.BG_CARD, fg=Theme.TEXT_MUTED).pack(side="left")
+
+        self.cap_pct = tk.Label(cap_hdr, text="0%", font=(Theme.FONT, 9, "bold"),
+                                bg=Theme.BG_CARD, fg=Theme.BLUE)
+        self.cap_pct.pack(side="right")
+
+        self.cap_bar = ProgressBar(cap_frame, 240, 4)
+        self.cap_bar.pack(fill="x", pady=(5, 0))
+
+        self.cap_info = tk.Label(cap_frame, text="Select an image",
+                                 font=(Theme.FONT, 9), bg=Theme.BG_CARD,
+                                 fg=Theme.TEXT_MUTED)
+        self.cap_info.pack(anchor="w", pady=(3, 0))
+
+        # Right
+        right = tk.Frame(container, bg=Theme.BG_MAIN)
+        right.pack(side="right", fill="both", expand=True, padx=(9, 0))
+
+        # Message
+        card2 = Card(right)
+        card2.pack(fill="x")
+
+        c2 = tk.Frame(card2, bg=Theme.BG_CARD)
+        c2.pack(fill="both", padx=14, pady=14)
+
+        hdr2 = tk.Frame(c2, bg=Theme.BG_CARD)
+        hdr2.pack(fill="x", pady=(0, 6))
+
+        tk.Label(hdr2, text="💬  Secret Message", font=(Theme.FONT, 11, "bold"),
+                 bg=Theme.BG_CARD, fg=Theme.TEXT).pack(side="left")
+
+        self.char_lbl = tk.Label(hdr2, text="0 chars", font=(Theme.FONT, 9),
+                                 bg=Theme.BG_CARD, fg=Theme.TEXT_MUTED)
+        self.char_lbl.pack(side="right")
+
+        self.msg_txt = TextArea(c2, 4)
+        self.msg_txt.pack(fill="x")
+        self.msg_txt.bind_key("<KeyRelease>", self._msg_change)
 
         # Password
-        tk.Label(right_col, text="Encryption Password (Optional)",
-                font=("Segoe UI Semibold", 13),
-                bg=ModernColors.BG_PRIMARY, fg=ModernColors.TEXT_PRIMARY,
-                anchor="w").pack(fill="x", pady=(0, 8))
+        card3 = Card(right)
+        card3.pack(fill="x", pady=(10, 0))
 
-        self.entry_pass_enc = ModernEntry(right_col, show="•")
-        self.entry_pass_enc.pack(fill="x", pady=(0, 16))
+        c3 = tk.Frame(card3, bg=Theme.BG_CARD)
+        c3.pack(fill="both", padx=14, pady=14)
 
-        # Technique
-        tk.Label(right_col, text="Technique", font=("Segoe UI Semibold", 13),
-                bg=ModernColors.BG_PRIMARY, fg=ModernColors.TEXT_PRIMARY,
-                anchor="w").pack(fill="x", pady=(0, 8))
+        tk.Label(c3, text="🔑  Password (Optional)", font=(Theme.FONT, 11, "bold"),
+                 bg=Theme.BG_CARD, fg=Theme.TEXT).pack(anchor="w")
+        tk.Label(c3, text="XOR cipher: result = message ⊕ key",
+                 font=(Theme.MONO, 9), bg=Theme.BG_CARD,
+                 fg=Theme.CYAN).pack(anchor="w", pady=(2, 6))
 
-        ModernRadioButton(right_col, "Standard LSB", self.algo_var, "LSB",
-                         "Basic least significant bit embedding").pack(fill="x")
-        ModernRadioButton(right_col, "LSB + XOR Encryption", self.algo_var, "XOR",
-                         "Enhanced security with password encryption").pack(fill="x")
+        self.enc_pass = Entry(c3, show="●")
+        self.enc_pass.pack(fill="x")
 
-        # Encode button
-        btn_frame = tk.Frame(right_col, bg=ModernColors.BG_PRIMARY)
-        btn_frame.pack(fill="x", pady=(24, 0))
+        # Button
+        Button(right, "Encrypt & Save Image", self._encode, "primary",
+               240, 44, "🔐").pack(pady=(14, 0))
 
-        self.btn_encode = ModernButton(btn_frame, text="🔐  Encrypt & Save Image",
-                                       command=self.process_encode, variant="gradient",
-                                       width=280, height=48)
-        self.btn_encode.pack(fill="x")
+    def _decode_tab(self):
+        frame = tk.Frame(self.content, bg=Theme.BG_MAIN)
+        self.tabs.append(frame)
 
-    def _setup_decode_tab(self):
-        """Setup the decode tab."""
-        frame = tk.Frame(self.content, bg=ModernColors.BG_PRIMARY)
-        self.tab_frames.append(frame)
+        container = tk.Frame(frame, bg=Theme.BG_MAIN)
+        container.pack(fill="both", expand=True, padx=18, pady=18)
 
-        # Center container
-        container = tk.Frame(frame, bg=ModernColors.BG_PRIMARY)
-        container.pack(fill="both", expand=True, padx=24, pady=24)
+        # Left
+        left = tk.Frame(container, bg=Theme.BG_MAIN)
+        left.pack(side="left", fill="both", expand=True, padx=(0, 9))
 
-        # Image dropzone
-        tk.Label(container, text="Stego Image", font=("Segoe UI Semibold", 13),
-                bg=ModernColors.BG_PRIMARY, fg=ModernColors.TEXT_PRIMARY,
-                anchor="w").pack(fill="x", pady=(0, 12))
+        card1 = Card(left)
+        card1.pack(fill="both", expand=True)
 
-        dropzone_frame = tk.Frame(container, bg=ModernColors.BG_PRIMARY)
-        dropzone_frame.pack(fill="x")
+        c1 = tk.Frame(card1, bg=Theme.BG_CARD)
+        c1.pack(fill="both", expand=True, padx=14, pady=14)
 
-        self.decode_dropzone = ModernImageDropzone(dropzone_frame, self._on_decode_image_load, self._on_decode_image_reset)
-        self.decode_dropzone.pack(fill="both", expand=True, pady=(0, 16))
+        tk.Label(c1, text="🖼️  Stego Image", font=(Theme.FONT, 11, "bold"),
+                 bg=Theme.BG_CARD, fg=Theme.TEXT).pack(anchor="w", pady=(0, 10))
+
+        self.dec_drop = Dropzone(c1, self._dec_load, self._dec_reset)
+        self.dec_drop.pack(fill="both", expand=True)
+
+        # Right
+        right = tk.Frame(container, bg=Theme.BG_MAIN)
+        right.pack(side="right", fill="both", expand=True, padx=(9, 0))
 
         # Password
-        tk.Label(container, text="Decryption Password (if encrypted)",
-                font=("Segoe UI Semibold", 13),
-                bg=ModernColors.BG_PRIMARY, fg=ModernColors.TEXT_PRIMARY,
-                anchor="w").pack(fill="x", pady=(0, 8))
+        card2 = Card(right)
+        card2.pack(fill="x")
 
-        self.entry_pass_dec = ModernEntry(container, show="•")
-        self.entry_pass_dec.pack(fill="x", pady=(0, 16))
+        c2 = tk.Frame(card2, bg=Theme.BG_CARD)
+        c2.pack(fill="both", padx=14, pady=14)
 
-        # Decode button
-        self.btn_decode = ModernButton(container, text="🔍  Reveal Hidden Message",
-                                       command=self.process_decode, variant="success",
-                                       width=280, height=48)
-        self.btn_decode.pack(pady=(0, 16))
+        tk.Label(c2, text="🔑  Password", font=(Theme.FONT, 11, "bold"),
+                 bg=Theme.BG_CARD, fg=Theme.TEXT).pack(anchor="w", pady=(0, 6))
+
+        self.dec_pass = Entry(c2, show="●")
+        self.dec_pass.pack(fill="x")
+
+        Button(right, "Reveal Message", self._decode, "success",
+               180, 40, "🔍").pack(pady=(10, 0))
 
         # Output
-        output_header = tk.Frame(container, bg=ModernColors.BG_PRIMARY)
-        output_header.pack(fill="x", pady=(0, 8))
+        card3 = Card(right)
+        card3.pack(fill="both", expand=True, pady=(10, 0))
 
-        tk.Label(output_header, text="Hidden Message", font=("Segoe UI Semibold", 13),
-                bg=ModernColors.BG_PRIMARY, fg=ModernColors.TEXT_PRIMARY,
-                anchor="w").pack(side="left")
+        c3 = tk.Frame(card3, bg=Theme.BG_CARD)
+        c3.pack(fill="both", expand=True, padx=14, pady=14)
 
-        # Clear button for output
-        self.btn_clear_output = ModernButton(output_header, text="Clear",
-                                           command=self._clear_output,
-                                           variant="secondary",
-                                           width=80, height=28)
-        self.btn_clear_output.pack(side="right")
+        hdr3 = tk.Frame(c3, bg=Theme.BG_CARD)
+        hdr3.pack(fill="x", pady=(0, 6))
 
-        self.txt_output = ModernText(container, height=4)
-        self.txt_output.config(fg=ModernColors.ACCENT_GREEN)
-        self.txt_output.pack(fill="x")
+        tk.Label(hdr3, text="📝  Message", font=(Theme.FONT, 11, "bold"),
+                 bg=Theme.BG_CARD, fg=Theme.TEXT).pack(side="left")
 
-    def _setup_analysis_tab(self):
-        """Setup the analysis tab."""
-        frame = tk.Frame(self.content, bg=ModernColors.BG_PRIMARY)
-        self.tab_frames.append(frame)
+        Button(hdr3, "Copy", self._copy, "ghost",
+               65, 26, "📋").pack(side="right")
 
-        container = tk.Frame(frame, bg=ModernColors.BG_PRIMARY)
-        container.pack(fill="both", expand=True, padx=24, pady=24)
+        self.output = TextArea(c3, 6)
+        self.output.pack(fill="both", expand=True)
 
-        # Title
-        tk.Label(container, text="Mathematical Analysis",
-                font=("Segoe UI Semibold", 16),
-                bg=ModernColors.BG_PRIMARY, fg=ModernColors.TEXT_PRIMARY,
-                anchor="w").pack(fill="x", pady=(0, 8))
+    def _analysis_tab(self):
+        frame = tk.Frame(self.content, bg=Theme.BG_MAIN)
+        self.tabs.append(frame)
 
-        tk.Label(container, text="Compare original and stego images to measure quality degradation",
-                font=("Segoe UI", 11),
-                bg=ModernColors.BG_PRIMARY, fg=ModernColors.TEXT_SECONDARY,
-                anchor="w").pack(fill="x", pady=(0, 20))
+        # Scrollable container
+        canvas = tk.Canvas(frame, bg=Theme.BG_MAIN, highlightthickness=0)
+        scrollbar = tk.Scrollbar(
+            frame, orient="vertical", command=canvas.yview)
+        scrollable = tk.Frame(canvas, bg=Theme.BG_MAIN)
 
-        # Metrics cards
-        metrics_frame = tk.Frame(container, bg=ModernColors.BG_PRIMARY)
-        metrics_frame.pack(fill="x", pady=(0, 20))
+        scrollable.bind("<Configure>", lambda e: canvas.configure(
+            scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=scrollable, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
 
-        # MSE Card
-        mse_card = ModernCard(metrics_frame)
-        mse_card.pack(side="left", fill="both", expand=True, padx=(0, 8))
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
 
-        mse_inner = tk.Frame(mse_card, bg=ModernColors.BG_CARD)
-        mse_inner.pack(fill="both", expand=True, padx=20, pady=16)
+        container = tk.Frame(scrollable, bg=Theme.BG_MAIN)
+        container.pack(fill="both", expand=True, padx=18, pady=18)
 
-        tk.Label(mse_inner, text="MSE", font=("Segoe UI", 10),
-                bg=ModernColors.BG_CARD, fg=ModernColors.TEXT_SECONDARY).pack(anchor="w")
-        self.lbl_mse = tk.Label(mse_inner, text="N/A", font=("Segoe UI Semibold", 18),
-                               bg=ModernColors.BG_CARD, fg=ModernColors.ACCENT_BLUE)
-        self.lbl_mse.pack(anchor="w", pady=(4, 0))
-        tk.Label(mse_inner, text="Mean Squared Error", font=("Segoe UI", 9),
-                bg=ModernColors.BG_CARD, fg=ModernColors.TEXT_MUTED).pack(anchor="w")
+        # Header
+        tk.Label(container, text="📊  Quality Analysis",
+                 font=(Theme.FONT, 14, "bold"),
+                 bg=Theme.BG_MAIN, fg=Theme.TEXT).pack(anchor="w")
+        tk.Label(container, text="Mathematical comparison of original vs stego image",
+                 font=(Theme.FONT, 10), bg=Theme.BG_MAIN,
+                 fg=Theme.TEXT_SEC).pack(anchor="w", pady=(2, 14))
 
-        # PSNR Card
-        psnr_card = ModernCard(metrics_frame)
-        psnr_card.pack(side="left", fill="both", expand=True, padx=(8, 0))
+        # Quality Metrics
+        metrics = tk.Frame(container, bg=Theme.BG_MAIN)
+        metrics.pack(fill="x", pady=(0, 12))
 
-        psnr_inner = tk.Frame(psnr_card, bg=ModernColors.BG_CARD)
-        psnr_inner.pack(fill="both", expand=True, padx=20, pady=16)
+        self.mse = MetricCard(metrics, "📉", "MSE", Theme.BLUE)
+        self.mse.pack(side="left", fill="both", expand=True, padx=(0, 5))
 
-        tk.Label(psnr_inner, text="PSNR", font=("Segoe UI", 10),
-                bg=ModernColors.BG_CARD, fg=ModernColors.TEXT_SECONDARY).pack(anchor="w")
-        self.lbl_psnr = tk.Label(psnr_inner, text="N/A", font=("Segoe UI Semibold", 18),
-                                bg=ModernColors.BG_CARD, fg=ModernColors.ACCENT_GREEN)
-        self.lbl_psnr.pack(anchor="w", pady=(4, 0))
-        tk.Label(psnr_inner, text="Signal-to-Noise Ratio (dB)", font=("Segoe UI", 9),
-                bg=ModernColors.BG_CARD, fg=ModernColors.TEXT_MUTED).pack(anchor="w")
+        self.psnr = MetricCard(metrics, "📈", "PSNR", Theme.GREEN)
+        self.psnr.pack(side="left", fill="both", expand=True, padx=5)
 
-        # Calculate button
-        self.btn_analysis = ModernButton(container, text="📊  Calculate Metrics",
-                                        command=self.run_analysis, variant="primary",
-                                        width=200, height=44)
-        self.btn_analysis.pack(pady=(0, 20))
+        self.ssim_card = MetricCard(metrics, "🔗", "SSIM", Theme.PURPLE)
+        self.ssim_card.pack(side="left", fill="both", expand=True, padx=5)
 
-        # EXIF Data
-        tk.Label(container, text="Image Metadata (EXIF)", font=("Segoe UI Semibold", 13),
-                bg=ModernColors.BG_PRIMARY, fg=ModernColors.TEXT_PRIMARY,
-                anchor="w").pack(fill="x", pady=(0, 8))
+        self.corr = MetricCard(metrics, "📊", "Correlation", Theme.CYAN)
+        self.corr.pack(side="left", fill="both", expand=True, padx=(5, 0))
 
-        self.txt_exif = ModernText(container, height=10)
-        self.txt_exif.pack(fill="both", expand=True)
+        Button(container, "Calculate All Metrics", self._analyze, "primary",
+               200, 40, "🔬").pack(pady=(0, 14))
+
+        # Entropy & Statistics
+        stats_row = tk.Frame(container, bg=Theme.BG_MAIN)
+        stats_row.pack(fill="x", pady=(0, 12))
+
+        # Entropy card
+        ent_card = Card(stats_row)
+        ent_card.pack(side="left", fill="both", expand=True, padx=(0, 5))
+
+        ent_c = tk.Frame(ent_card, bg=Theme.BG_CARD)
+        ent_c.pack(fill="both", expand=True, padx=14, pady=14)
+
+        tk.Label(ent_c, text="🎲  Shannon Entropy", font=(Theme.FONT, 11, "bold"),
+                 bg=Theme.BG_CARD, fg=Theme.TEXT).pack(anchor="w")
+        tk.Label(ent_c, text="H(X) = -Σ p(x) · log₂(p(x))",
+                 font=(Theme.MONO, 9), bg=Theme.BG_CARD, fg=Theme.CYAN).pack(anchor="w", pady=(2, 8))
+
+        self.entropy_orig = tk.Label(ent_c, text="Original: --", font=(Theme.FONT, 10),
+                                     bg=Theme.BG_CARD, fg=Theme.TEXT_SEC)
+        self.entropy_orig.pack(anchor="w")
+        self.entropy_stego = tk.Label(ent_c, text="Stego: --", font=(Theme.FONT, 10),
+                                      bg=Theme.BG_CARD, fg=Theme.TEXT_SEC)
+        self.entropy_stego.pack(anchor="w")
+
+        # Chi-Square card
+        chi_card = Card(stats_row)
+        chi_card.pack(side="left", fill="both", expand=True, padx=(5, 0))
+
+        chi_c = tk.Frame(chi_card, bg=Theme.BG_CARD)
+        chi_c.pack(fill="both", expand=True, padx=14, pady=14)
+
+        tk.Label(chi_c, text="📐  Chi-Square Test", font=(Theme.FONT, 11, "bold"),
+                 bg=Theme.BG_CARD, fg=Theme.TEXT).pack(anchor="w")
+        tk.Label(chi_c, text="χ² = Σ (O - E)² / E",
+                 font=(Theme.MONO, 9), bg=Theme.BG_CARD, fg=Theme.CYAN).pack(anchor="w", pady=(2, 8))
+
+        self.chi_value = tk.Label(chi_c, text="χ² value: --", font=(Theme.FONT, 10),
+                                  bg=Theme.BG_CARD, fg=Theme.TEXT_SEC)
+        self.chi_value.pack(anchor="w")
+        self.chi_result = tk.Label(chi_c, text="Detection: --", font=(Theme.FONT, 10),
+                                   bg=Theme.BG_CARD, fg=Theme.TEXT_SEC)
+        self.chi_result.pack(anchor="w")
+
+        # LSB Analysis
+        lsb_card = Card(container)
+        lsb_card.pack(fill="x", pady=(0, 12))
+
+        lsb_c = tk.Frame(lsb_card, bg=Theme.BG_CARD)
+        lsb_c.pack(fill="both", padx=14, pady=14)
+
+        tk.Label(lsb_c, text="🔢  LSB Distribution", font=(Theme.FONT, 11, "bold"),
+                 bg=Theme.BG_CARD, fg=Theme.TEXT).pack(anchor="w")
+        tk.Label(lsb_c, text="Analysis of Least Significant Bits (natural images ≈ 50/50)",
+                 font=(Theme.FONT, 9), bg=Theme.BG_CARD, fg=Theme.TEXT_MUTED).pack(anchor="w", pady=(2, 8))
+
+        self.lsb_info = tk.Label(lsb_c, text="Load an image to analyze LSB distribution",
+                                 font=(Theme.MONO, 10), bg=Theme.BG_CARD, fg=Theme.TEXT_SEC)
+        self.lsb_info.pack(anchor="w")
+
+        # Histogram
+        hist_card = Card(container)
+        hist_card.pack(fill="x")
+
+        hist_c = tk.Frame(hist_card, bg=Theme.BG_CARD)
+        hist_c.pack(fill="both", padx=14, pady=14)
+
+        tk.Label(hist_c, text="📊  Histogram", font=(Theme.FONT, 11, "bold"),
+                 bg=Theme.BG_CARD, fg=Theme.TEXT).pack(anchor="w", pady=(0, 8))
+
+        self.histogram = HistogramCanvas(hist_c, 400, 120)
+        self.histogram.pack(anchor="w")
+
+    def _math_tab(self):
+        """Mathematics demonstration tab."""
+        frame = tk.Frame(self.content, bg=Theme.BG_MAIN)
+        self.tabs.append(frame)
+
+        # Scrollable
+        canvas = tk.Canvas(frame, bg=Theme.BG_MAIN, highlightthickness=0)
+        scrollbar = tk.Scrollbar(
+            frame, orient="vertical", command=canvas.yview)
+        scrollable = tk.Frame(canvas, bg=Theme.BG_MAIN)
+
+        scrollable.bind("<Configure>", lambda e: canvas.configure(
+            scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=scrollable, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        container = tk.Frame(scrollable, bg=Theme.BG_MAIN)
+        container.pack(fill="both", expand=True, padx=18, pady=18)
+
+        # Header
+        tk.Label(container, text="📐  Mathematics Explained",
+                 font=(Theme.FONT, 14, "bold"),
+                 bg=Theme.BG_MAIN, fg=Theme.TEXT).pack(anchor="w")
+        tk.Label(container, text="Understanding the math behind steganography",
+                 font=(Theme.FONT, 10), bg=Theme.BG_MAIN,
+                 fg=Theme.TEXT_SEC).pack(anchor="w", pady=(2, 14))
+
+        # Binary Conversion
+        bin_card = Card(container)
+        bin_card.pack(fill="x", pady=(0, 12))
+
+        bin_c = tk.Frame(bin_card, bg=Theme.BG_CARD)
+        bin_c.pack(fill="both", padx=14, pady=14)
+
+        tk.Label(bin_c, text="🔢  Binary Conversion", font=(Theme.FONT, 11, "bold"),
+                 bg=Theme.BG_CARD, fg=Theme.TEXT).pack(anchor="w")
+        tk.Label(bin_c, text="Each character → ASCII → 8-bit binary",
+                 font=(Theme.FONT, 9), bg=Theme.BG_CARD, fg=Theme.TEXT_MUTED).pack(anchor="w", pady=(2, 8))
+
+        bin_input_frame = tk.Frame(bin_c, bg=Theme.BG_CARD)
+        bin_input_frame.pack(fill="x", pady=(0, 8))
+
+        tk.Label(bin_input_frame, text="Text:", font=(Theme.FONT, 10),
+                 bg=Theme.BG_CARD, fg=Theme.TEXT_SEC).pack(side="left")
+
+        self.bin_entry = Entry(bin_input_frame)
+        self.bin_entry.pack(side="left", fill="x", expand=True, padx=(8, 8))
+
+        Button(bin_input_frame, "Convert", self._convert_binary,
+               "cyan", 90, 34).pack(side="left")
+
+        self.bin_result = tk.Label(bin_c, text="", font=(Theme.MONO, 9),
+                                   bg=Theme.BG_CARD, fg=Theme.CYAN,
+                                   justify="left", anchor="w")
+        self.bin_result.pack(fill="x")
+
+        # XOR Demonstration
+        xor_card = Card(container)
+        xor_card.pack(fill="x", pady=(0, 12))
+
+        xor_c = tk.Frame(xor_card, bg=Theme.BG_CARD)
+        xor_c.pack(fill="both", padx=14, pady=14)
+
+        tk.Label(xor_c, text="⊕  XOR Encryption", font=(Theme.FONT, 11, "bold"),
+                 bg=Theme.BG_CARD, fg=Theme.TEXT).pack(anchor="w")
+        tk.Label(xor_c, text="XOR Truth Table: 0⊕0=0, 0⊕1=1, 1⊕0=1, 1⊕1=0",
+                 font=(Theme.MONO, 9), bg=Theme.BG_CARD, fg=Theme.CYAN).pack(anchor="w", pady=(2, 8))
+
+        xor_input = tk.Frame(xor_c, bg=Theme.BG_CARD)
+        xor_input.pack(fill="x", pady=(0, 8))
+
+        tk.Label(xor_input, text="Message:", font=(Theme.FONT, 10),
+                 bg=Theme.BG_CARD, fg=Theme.TEXT_SEC).pack(side="left")
+        self.xor_msg = Entry(xor_input)
+        self.xor_msg.pack(side="left", fill="x", expand=True, padx=8)
+
+        tk.Label(xor_input, text="Key:", font=(Theme.FONT, 10),
+                 bg=Theme.BG_CARD, fg=Theme.TEXT_SEC).pack(side="left")
+        self.xor_key = Entry(xor_input)
+        self.xor_key.pack(side="left", fill="x", expand=True, padx=8)
+
+        Button(xor_input, "Encrypt", self._demo_xor,
+               "purple", 90, 34).pack(side="left")
+
+        self.xor_result = tk.Label(xor_c, text="", font=(Theme.MONO, 9),
+                                   bg=Theme.BG_CARD, fg=Theme.PURPLE,
+                                   justify="left", anchor="w")
+        self.xor_result.pack(fill="x")
+
+        # LSB Explanation
+        lsb_card = Card(container)
+        lsb_card.pack(fill="x", pady=(0, 12))
+
+        lsb_c = tk.Frame(lsb_card, bg=Theme.BG_CARD)
+        lsb_c.pack(fill="both", padx=14, pady=14)
+
+        tk.Label(lsb_c, text="🎨  LSB Steganography", font=(Theme.FONT, 11, "bold"),
+                 bg=Theme.BG_CARD, fg=Theme.TEXT).pack(anchor="w")
+
+        explanation = """
+How LSB works:
+┌─────────────────────────────────────────────────────────┐
+│ Original pixel value:  156  =  10011100  (binary)       │
+│ Message bit to hide:                  1                 │
+│ ─────────────────────────────────────────               │
+│ New pixel value:       157  =  10011101  (binary)       │
+│                                      ↑                  │
+│                               LSB changed               │
+└─────────────────────────────────────────────────────────┘
+
+• Only the last bit (LSB) is modified
+• Change of ±1 in pixel value is invisible to human eye
+• Each pixel can store 1 bit of secret message
+• RGB image: 3 bits per pixel (one per channel)
+"""
+        tk.Label(lsb_c, text=explanation, font=(Theme.MONO, 9),
+                 bg=Theme.BG_CARD, fg=Theme.GREEN,
+                 justify="left", anchor="w").pack(anchor="w")
+
+        # Formulas Reference
+        form_card = Card(container)
+        form_card.pack(fill="x")
+
+        form_c = tk.Frame(form_card, bg=Theme.BG_CARD)
+        form_c.pack(fill="both", padx=14, pady=14)
+
+        tk.Label(form_c, text="📚  Mathematical Formulas", font=(Theme.FONT, 11, "bold"),
+                 bg=Theme.BG_CARD, fg=Theme.TEXT).pack(anchor="w", pady=(0, 8))
+
+        formulas_text = """
+┌──────────────────────────────────────────────────────────────────┐
+│ Mean Squared Error (MSE):                                        │
+│     MSE = (1/mn) × Σᵢ Σⱼ [I(i,j) - K(i,j)]²                      │
+│                                                                  │
+│ Peak Signal-to-Noise Ratio (PSNR):                               │
+│     PSNR = 10 × log₁₀(MAX² / MSE)  =  20 × log₁₀(MAX / √MSE)     │
+│     For 8-bit images, MAX = 255                                  │
+│                                                                  │
+│ Shannon Entropy:                                                 │
+│     H(X) = -Σ p(xᵢ) × log₂(p(xᵢ))                                │
+│     Maximum for 8-bit image = 8.0 bits                           │
+│                                                                  │
+│ Structural Similarity (SSIM):                                    │
+│     SSIM = (2μₓμᵧ + C₁)(2σₓᵧ + C₂) / (μₓ² + μᵧ² + C₁)(σₓ² + σᵧ² + C₂) │
+│                                                                  │
+│ Chi-Square Test:                                                 │
+│     χ² = Σ (Oᵢ - Eᵢ)² / Eᵢ                                       │
+│     O = Observed, E = Expected                                   │
+│                                                                  │
+│ Pearson Correlation:                                             │
+│     r = Σ(xᵢ - x̄)(yᵢ - ȳ) / √[Σ(xᵢ - x̄)² × Σ(yᵢ - ȳ)²]           │
+└──────────────────────────────────────────────────────────────────┘
+"""
+        tk.Label(form_c, text=formulas_text, font=(Theme.MONO, 9),
+                 bg=Theme.BG_CARD, fg=Theme.ORANGE,
+                 justify="left", anchor="w").pack(anchor="w")
 
     # -------------------------------------------------------------------------
-    # EVENT HANDLERS
+    # HANDLERS
     # -------------------------------------------------------------------------
 
-    def _on_encode_image_load(self, path):
-        """Handle image load for encoding."""
-        self.src_image_path = path
+    def _enc_load(self, path):
+        self.src_path = path
+        self._set_status(f"Loaded: {os.path.basename(path)}")
+        self._update_cap()
 
-    def _on_encode_image_reset(self):
-        """Handle image reset for encoding."""
-        self.src_image_path = None
+    def _enc_reset(self):
+        self.src_path = None
+        self._set_status("Ready")
+        self.cap_bar.set(0)
+        self.cap_pct.config(text="0%")
+        self.cap_info.config(text="Select an image")
 
-    def _on_decode_image_load(self, path):
-        """Handle image load for decoding."""
-        self.decoded_image_path = path
+    def _dec_load(self, path):
+        self.stego_path = path
+        self._set_status(f"Loaded: {os.path.basename(path)}")
 
-        # Show EXIF data
-        exif_info = StegoEngine.get_exif_data(path)
-        self.txt_exif.delete("1.0", tk.END)
-        self.txt_exif.insert("1.0", exif_info)
+        # Update histogram
+        hist_data = MathEngine.calculate_histogram(path)
+        if 'gray' in hist_data:
+            self.histogram.draw_histogram(hist_data['gray'], Theme.TEXT_SEC)
+        else:
+            self.histogram.draw_histogram(hist_data['red'], Theme.RED)
 
-    def _on_decode_image_reset(self):
-        """Handle image reset for decoding."""
-        self.decoded_image_path = None
-        # Clear EXIF data when image is removed
-        self.txt_exif.delete("1.0", tk.END)
+        # Update LSB analysis
+        lsb = MathEngine.analyze_lsb_distribution(path)
+        self.lsb_info.config(
+            text=f"Zeros: {lsb['zeros']:,} ({lsb['zero_ratio']*100:.2f}%)  |  "
+            f"Ones: {lsb['ones']:,} ({lsb['one_ratio']*100:.2f}%)  |  "
+            f"Balance deviation: {lsb['balance']*100:.3f}%"
+        )
 
-    def process_encode(self):
-        """Process the encoding."""
-        if not self.src_image_path:
-            ModernModal(self.root, "Error", "Please select an image first.", "error")
+        # Update entropy
+        entropy = MathEngine.calculate_entropy(path)
+        self.entropy_stego.config(text=f"Stego: {entropy:.4f} bits")
+
+    def _dec_reset(self):
+        self.stego_path = None
+        self._set_status("Ready")
+
+    def _msg_change(self, e=None):
+        length = len(self.msg_txt.get())
+        self.char_lbl.config(text=f"{length:,} chars")
+        self._update_cap()
+
+    def _update_cap(self):
+        if not self.src_path:
             return
 
-        msg = self.txt_msg.get("1.0", tk.END).strip()
+        cap = MathEngine.calculate_capacity_details(self.src_path)
+        used = len(self.msg_txt.get())
+
+        if cap['max_chars'] > 0:
+            pct = min(100, (used / cap['max_chars']) * 100)
+            self.cap_bar.set(pct)
+            self.cap_pct.config(text=f"{pct:.1f}%")
+            self.cap_info.config(text=f"{used:,} / {cap['max_chars']:,} chars  "
+                                 f"({cap['width']}×{cap['height']} = {cap['total_pixels']:,} pixels)")
+
+            if pct > 90:
+                self.cap_pct.config(fg=Theme.RED)
+            elif pct > 70:
+                self.cap_pct.config(fg=Theme.ORANGE)
+            else:
+                self.cap_pct.config(fg=Theme.BLUE)
+
+        # Update original entropy
+        entropy = MathEngine.calculate_entropy(self.src_path)
+        self.entropy_orig.config(text=f"Original: {entropy:.4f} bits")
+
+    def _encode(self):
+        if not self.src_path:
+            messagebox.showerror("Error", "Please select an image!")
+            return
+
+        msg = self.msg_txt.get().strip()
         if not msg:
-            ModernModal(self.root, "Error", "Please enter a secret message.", "error")
+            messagebox.showerror("Error", "Please enter a message!")
             return
 
-        password = self.entry_pass_enc.get() if self.entry_pass_enc.get() else None
+        pwd = self.enc_pass.get() or None
 
         try:
-            stego_img = StegoEngine.encode_lsb(self.src_image_path, msg, password)
-            self.stego_image_object = stego_img
+            self._set_status("Encoding...")
+            self.root.update()
 
-            save_path = filedialog.asksaveasfilename(
+            stego = StegoEngine.encode(self.src_path, msg, pwd)
+
+            save = filedialog.asksaveasfilename(
+                title="Save Stego Image",
                 defaultextension=".png",
-                filetypes=[("PNG Image", "*.png")]
+                filetypes=[("PNG", "*.png")],
+                initialfile="stego_image.png"
             )
 
-            if save_path:
-                stego_img.save(save_path)
-                self.decoded_image_path = save_path
-                ModernModal(self.root, "Success",
-                           f"Image saved successfully!\n\n{os.path.basename(save_path)}",
-                           "success")
+            if save:
+                stego.save(save)
+                self.stego_path = save
+                self._set_status(f"Saved: {os.path.basename(save)}")
+                messagebox.showinfo(
+                    "Success ✓", f"Message hidden!\nSaved to: {save}")
         except Exception as e:
-            ModernModal(self.root, "Error", str(e), "error")
+            self._set_status("Error")
+            messagebox.showerror("Error", str(e))
 
-    def process_decode(self):
-        """Process the decoding."""
-        if not self.decoded_image_path:
-            ModernModal(self.root, "Error", "Please select a stego image first.", "error")
+    def _decode(self):
+        if not self.stego_path:
+            messagebox.showerror("Error", "Please select a stego image!")
             return
 
-        password = self.entry_pass_dec.get()
+        pwd = self.dec_pass.get() or None
 
         try:
-            msg = StegoEngine.decode_lsb(self.decoded_image_path, password)
-            self.txt_output.delete("1.0", tk.END)
-            self.txt_output.insert("1.0", msg)
-        except Exception as e:
-            ModernModal(self.root, "Error", str(e), "error")
+            self._set_status("Decoding...")
+            self.root.update()
 
-    def run_analysis(self):
-        """Run the mathematical analysis."""
-        if not self.src_image_path or not self.decoded_image_path:
-            ModernModal(self.root, "Error",
-                       "Need both original and stego images loaded.\n\nEncode an image first, or load both images separately.",
-                       "error")
+            msg = StegoEngine.decode(self.stego_path, pwd)
+
+            self.output.delete()
+            self.output.insert(msg)
+
+            self._set_status("Done")
+
+            if not msg.startswith("No hidden"):
+                messagebox.showinfo("Success ✓", "Message extracted!")
+        except Exception as e:
+            self._set_status("Error")
+            messagebox.showerror("Error", str(e))
+
+    def _analyze(self):
+        if not self.src_path or not self.stego_path:
+            messagebox.showwarning(
+                "Warning", "Need both original and stego images!")
             return
 
         try:
-            orig = Image.open(self.src_image_path)
-            stego = Image.open(self.decoded_image_path)
+            # MSE & PSNR
+            mse_val, psnr_val = MathEngine.calculate_mse_psnr(
+                self.src_path, self.stego_path)
+            self.mse.set(f"{mse_val:.6f}")
+            self.psnr.set(f"{psnr_val:.2f} dB" if psnr_val !=
+                          float('inf') else "∞")
 
-            if orig.size != stego.size:
-                ModernModal(self.root, "Error",
-                           "Images must be the same size for comparison.",
-                           "error")
-                return
+            # SSIM
+            ssim_val = MathEngine.calculate_ssim(
+                self.src_path, self.stego_path)
+            self.ssim_card.set(f"{ssim_val:.6f}")
 
-            mse, psnr = StegoEngine.calculate_metrics(orig, stego)
+            # Correlation
+            corr_val = MathEngine.calculate_correlation(
+                self.src_path, self.stego_path)
+            self.corr.set(f"{corr_val:.6f}")
 
-            self.lbl_mse.config(text=f"{mse:.6f}")
-            psnr_text = f"{psnr:.2f} dB" if psnr != float('inf') else "∞ (Identical)"
-            self.lbl_psnr.config(text=psnr_text)
+            # Entropy
+            ent_orig = MathEngine.calculate_entropy(self.src_path)
+            ent_stego = MathEngine.calculate_entropy(self.stego_path)
+            self.entropy_orig.config(text=f"Original: {ent_orig:.4f} bits")
+            self.entropy_stego.config(text=f"Stego: {ent_stego:.4f} bits")
 
-            if mse < 0.1:
-                ModernModal(self.root, "Analysis Complete",
-                           "The images are mathematically almost identical!\n\nThis proves the steganography is virtually invisible to the human eye.",
-                           "success")
+            # Chi-Square
+            chi_sq, dof, p_val = MathEngine.chi_square_test(self.stego_path)
+            self.chi_value.config(text=f"χ² = {chi_sq:.2f} (df={dof})")
+
+            if p_val < 0.05:
+                self.chi_result.config(
+                    text=f"⚠ Likely contains hidden data (p={p_val:.4f})", fg=Theme.ORANGE)
             else:
-                ModernModal(self.root, "Analysis Complete",
-                           f"MSE: {mse:.6f}\nPSNR: {psnr_text}\n\nThe lower the MSE and higher the PSNR, the better the quality.",
-                           "info")
+                self.chi_result.config(
+                    text=f"✓ Appears normal (p={p_val:.4f})", fg=Theme.GREEN)
+
+            # LSB
+            lsb = MathEngine.analyze_lsb_distribution(self.stego_path)
+            self.lsb_info.config(
+                text=f"Zeros: {lsb['zeros']:,} ({lsb['zero_ratio']*100:.2f}%)  |  "
+                f"Ones: {lsb['ones']:,} ({lsb['one_ratio']*100:.2f}%)  |  "
+                f"Balance: {lsb['balance']*100:.3f}%"
+            )
+
+            self._set_status("Analysis complete")
+
+            # Summary
+            quality = "Excellent" if psnr_val > 50 else "Very Good" if psnr_val > 40 else "Good" if psnr_val > 30 else "Fair"
+
+            messagebox.showinfo("Analysis Results",
+                                f"Quality Metrics:\n"
+                                f"  • MSE: {mse_val:.6f}\n"
+                                f"  • PSNR: {psnr_val:.2f} dB ({quality})\n"
+                                f"  • SSIM: {ssim_val:.6f}\n"
+                                f"  • Correlation: {corr_val:.6f}\n\n"
+                                f"Entropy:\n"
+                                f"  • Original: {ent_orig:.4f} bits\n"
+                                f"  • Stego: {ent_stego:.4f} bits\n\n"
+                                f"Chi-Square: {chi_sq:.2f} (p={p_val:.4f})"
+                                )
 
         except Exception as e:
-            ModernModal(self.root, "Error", str(e), "error")
+            messagebox.showerror("Error", str(e))
 
-    def _switch_tab(self, index):
-        """Switch to a different tab."""
-        self.current_tab = index
+    def _convert_binary(self):
+        text = self.bin_entry.get()[:20]  # Limit
+        if not text:
+            return
 
-        # Update tab buttons
+        result = MathEngine.text_to_binary(text)
+        lines = []
+        for char, ascii_val, binary in result:
+            display_char = char if char.isprintable() else '?'
+            lines.append(f"'{display_char}' → {ascii_val:3d} → {binary}")
+
+        self.bin_result.config(text="\n".join(lines))
+
+    def _demo_xor(self):
+        msg = self.xor_msg.get()[:10]
+        key = self.xor_key.get()
+
+        if not msg or not key:
+            return
+
+        result = MathEngine.demonstrate_xor(msg, key)
+        lines = ["Char  Binary      Key   Binary      XOR Result"]
+        lines.append("─" * 50)
+
+        for r in result:
+            lines.append(
+                f" {r['char']}    {r['char_bin']}   "
+                f"{r['key_char']}     {r['key_bin']}   "
+                f"{r['xor_bin']} ({r['xor_result']})"
+            )
+
+        self.xor_result.config(text="\n".join(lines))
+
+    def _copy(self):
+        txt = self.output.get().strip()
+        if txt:
+            self.root.clipboard_clear()
+            self.root.clipboard_append(txt)
+            self._set_status("Copied!")
+
+    def _switch(self, idx):
+        self.current_tab = idx
+
+        for i, item in enumerate(self.nav):
+            item.set_active(i == idx)
+
+        titles = ["🔒  Encode", "🔓  Decode", "📊  Analysis", "📐  Mathematics"]
+        self.title.config(text=titles[idx])
+
         for i, tab in enumerate(self.tabs):
-            tab.set_active(i == index)
-
-        # Show/hide tab frames
-        for i, frame in enumerate(self.tab_frames):
-            if i == index:
-                frame.pack(fill="both", expand=True)
+            if i == idx:
+                tab.pack(fill="both", expand=True)
             else:
-                frame.pack_forget()
+                tab.pack_forget()
 
-    # -------------------------------------------------------------------------
-    # RESET/CLEAR FUNCTIONS
-    # -------------------------------------------------------------------------
-
-    def _clear_message(self):
-        """Clear the secret message text area."""
-        self.txt_msg.delete("1.0", tk.END)
-
-    def _clear_output(self):
-        """Clear the output text area."""
-        self.txt_output.delete("1.0", tk.END)
+    def _set_status(self, txt):
+        self.status.config(text=txt)
+        self.root.update_idletasks()
 
 
 # -------------------------------------------------------------------------
-# ENTRY POINT
+# RUN
 # -------------------------------------------------------------------------
 
 if __name__ == "__main__":
     root = tk.Tk()
 
-    # Set app icon (if available)
     try:
         if platform.system() == "Windows":
             root.iconbitmap("icon.ico")
     except:
         pass
 
-    app = StegoApp(root)
-    root.state('zoomed')  # <--- MAXIMIZE WINDOW
+    app = App(root)
+
+    try:
+        root.state('zoomed')
+    except:
+        try:
+            root.attributes('-zoomed', True)
+        except:
+            pass
+
     root.mainloop()
