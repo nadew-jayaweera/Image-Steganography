@@ -1308,10 +1308,16 @@ class App:
         Button(bin_input_frame, "Convert", self._convert_binary,
                "cyan", 90, 34).pack(side="left")
 
-        self.bin_result = tk.Label(bin_c, text="", font=(Theme.MONO, 9),
+        bin_result_frame = tk.Frame(bin_c, bg=Theme.BG_CARD)
+        bin_result_frame.pack(fill="x", pady=(8, 0))
+
+        self.bin_result = tk.Label(bin_result_frame, text="", font=(Theme.MONO, 9),
                                    bg=Theme.BG_CARD, fg=Theme.CYAN,
                                    justify="left", anchor="w")
-        self.bin_result.pack(fill="x")
+        self.bin_result.pack(side="left", fill="both", expand=True)
+
+        Button(bin_result_frame, "Copy", self._copy_binary_result,
+               "purple", 70, 34).pack(side="left", padx=(8, 0))
 
         # XOR Demonstration
         xor_card = Card(container)
@@ -1341,10 +1347,16 @@ class App:
         Button(xor_input, "Encrypt", self._demo_xor,
                "purple", 90, 34).pack(side="left")
 
-        self.xor_result = tk.Label(xor_c, text="", font=(Theme.MONO, 9),
+        xor_result_frame = tk.Frame(xor_c, bg=Theme.BG_CARD)
+        xor_result_frame.pack(fill="x", pady=(8, 0))
+
+        self.xor_result = tk.Label(xor_result_frame, text="", font=(Theme.MONO, 9),
                                    bg=Theme.BG_CARD, fg=Theme.PURPLE,
                                    justify="left", anchor="w")
-        self.xor_result.pack(fill="x")
+        self.xor_result.pack(side="left", fill="both", expand=True)
+
+        Button(xor_result_frame, "Copy", self._copy_xor_result,
+               "purple", 70, 34).pack(side="left", padx=(8, 0))
 
         # LSB Explanation
         lsb_card = Card(container)
@@ -1387,29 +1399,34 @@ How LSB works:
                  bg=Theme.BG_CARD, fg=Theme.TEXT).pack(anchor="w", pady=(0, 8))
 
         formulas_text = """
-┌──────────────────────────────────────────────────────────────────┐
-│ Mean Squared Error (MSE):                                        │
-│     MSE = (1/mn) × Σᵢ Σⱼ [I(i,j) - K(i,j)]²                      │
-│                                                                  │
-│ Peak Signal-to-Noise Ratio (PSNR):                               │
-│     PSNR = 10 × log₁₀(MAX² / MSE)  =  20 × log₁₀(MAX / √MSE)     │
-│     For 8-bit images, MAX = 255                                  │
-│                                                                  │
-│ Shannon Entropy:                                                 │
-│     H(X) = -Σ p(xᵢ) × log₂(p(xᵢ))                                │
-│     Maximum for 8-bit image = 8.0 bits                           │
-│                                                                  │
-│ Structural Similarity (SSIM):                                    │
-│     SSIM = (2μₓμᵧ + C₁)(2σₓᵧ + C₂) / (μₓ² + μᵧ² + C₁)(σₓ² + σᵧ² + C₂) │
-│                                                                  │
-│ Chi-Square Test:                                                 │
-│     χ² = Σ (Oᵢ - Eᵢ)² / Eᵢ                                       │
-│     O = Observed, E = Expected                                   │
-│                                                                  │
-│ Pearson Correlation:                                             │
-│     r = Σ(xᵢ - x̄)(yᵢ - ȳ) / √[Σ(xᵢ - x̄)² × Σ(yᵢ - ȳ)²]           │
-└──────────────────────────────────────────────────────────────────┘
+IMAGE QUALITY METRICS
+────────────────────────────────────────
+
+Mean Squared Error (MSE):
+  MSE = (1 / (m * n)) * ΣΣ [ I(i, j) - K(i, j) ]²
+
+Peak Signal-to-Noise Ratio (PSNR):
+  PSNR = 10 * log10(MAX² / MSE)
+  PSNR = 20 * log10(MAX / sqrt(MSE))
+  For 8-bit images: MAX = 255
+
+Shannon Entropy:
+  H(X) = - Σ p(xᵢ) * log2(p(xᵢ))
+  Max entropy for 8-bit image = 8.0 bits
+
+Structural Similarity Index (SSIM):
+  SSIM = ((2 * μx * μy + C1) * (2 * σxy + C2)) /
+         ((μx² + μy² + C1) * (σx² + σy² + C2))
+
+Chi-Square Test:
+  χ² = Σ (Oi - Ei)² / Ei
+  O = Observed, E = Expected
+
+Pearson Correlation Coefficient:
+  r = Σ (xi - x̄)(yi - ȳ) /
+      sqrt( Σ(xi - x̄)² * Σ(yi - ȳ)² )
 """
+
         tk.Label(form_c, text=formulas_text, font=(Theme.MONO, 9),
                  bg=Theme.BG_CARD, fg=Theme.ORANGE,
                  justify="left", anchor="w").pack(anchor="w")
@@ -1626,7 +1643,14 @@ How LSB works:
             display_char = char if char.isprintable() else '?'
             lines.append(f"'{display_char}' → {ascii_val:3d} → {binary}")
 
-        self.bin_result.config(text="\n".join(lines))
+        self.bin_result_text = "\n".join(lines)
+        self.bin_result.config(text=self.bin_result_text)
+
+    def _copy_binary_result(self):
+        if hasattr(self, 'bin_result_text') and self.bin_result_text:
+            self.root.clipboard_clear()
+            self.root.clipboard_append(self.bin_result_text)
+            self._set_status("Binary conversion copied!")
 
     def _demo_xor(self):
         msg = self.xor_msg.get()[:10]
@@ -1646,7 +1670,14 @@ How LSB works:
                 f"{r['xor_bin']} ({r['xor_result']})"
             )
 
-        self.xor_result.config(text="\n".join(lines))
+        self.xor_result_text = "\n".join(lines)
+        self.xor_result.config(text=self.xor_result_text)
+
+    def _copy_xor_result(self):
+        if hasattr(self, 'xor_result_text') and self.xor_result_text:
+            self.root.clipboard_clear()
+            self.root.clipboard_append(self.xor_result_text)
+            self._set_status("XOR encryption copied!")
 
     def _copy(self):
         txt = self.output.get().strip()
