@@ -1168,13 +1168,13 @@ class App:
         metrics = tk.Frame(container, bg=Theme.BG_MAIN)
         metrics.pack(fill="x", pady=(0, 12))
 
-        self.mse = MetricCard(metrics, "📉", "MSE", Theme.BLUE)
+        self.mse = MetricCard(metrics, "📉", "MSE (Mean Squared Error)", Theme.BLUE)
         self.mse.pack(side="left", fill="both", expand=True, padx=(0, 5))
 
-        self.psnr = MetricCard(metrics, "📈", "PSNR", Theme.GREEN)
+        self.psnr = MetricCard(metrics, "📈", "PSNR (Peak Signal-to-Noise Ratio)", Theme.GREEN)
         self.psnr.pack(side="left", fill="both", expand=True, padx=5)
 
-        self.ssim_card = MetricCard(metrics, "🔗", "SSIM", Theme.PURPLE)
+        self.ssim_card = MetricCard(metrics, "🔗", "SSIM (Structural Similarity Index)", Theme.PURPLE)
         self.ssim_card.pack(side="left", fill="both", expand=True, padx=5)
 
         self.corr = MetricCard(metrics, "📊", "Correlation", Theme.CYAN)
