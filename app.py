@@ -1060,7 +1060,7 @@ class App:
         c3 = tk.Frame(card3, bg=Theme.BG_CARD)
         c3.pack(fill="both", padx=14, pady=14)
 
-        tk.Label(c3, text="🔑  Password (Optional)", font=(Theme.FONT, 11, "bold"),
+        tk.Label(c3, text="🔑  Password", font=(Theme.FONT, 11, "bold"),
                  bg=Theme.BG_CARD, fg=Theme.TEXT).pack(anchor="w")
         tk.Label(c3, text="XOR cipher: result = message ⊕ key",
                  font=(Theme.MONO, 9), bg=Theme.BG_CARD,
