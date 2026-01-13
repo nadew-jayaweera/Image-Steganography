@@ -5,7 +5,7 @@ Standard LSB Steganography with comprehensive mathematical analysis.
 """
 
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog
 import math
 import os
 from datetime import datetime
@@ -442,6 +442,149 @@ class Theme:
 
 
 # -------------------------------------------------------------------------
+# THEMED MESSAGE BOXES
+# -------------------------------------------------------------------------
+
+class ThemedMessageBox:
+    """Custom message boxes with theme support."""
+
+    @staticmethod
+    def showerror(title, message):
+        """Themed error message box."""
+        box = tk.Toplevel()
+        box.title(title)
+        box.geometry("400x200")
+        box.configure(bg=Theme.BG_MAIN)
+        box.resizable(False, False)
+        
+        # Center on screen
+        box.update_idletasks()
+        x = (box.winfo_screenwidth() // 2) - 200
+        y = (box.winfo_screenheight() // 2) - 100
+        box.geometry(f"+{x}+{y}")
+        
+        # Icon and title
+        frame_top = tk.Frame(box, bg=Theme.BG_CARD)
+        frame_top.pack(fill="x", padx=20, pady=(20, 10))
+        
+        tk.Label(frame_top, text="❌  " + title, font=(Theme.FONT, 12, "bold"),
+                bg=Theme.BG_CARD, fg=Theme.RED).pack(anchor="w")
+        
+        # Message
+        msg_frame = tk.Frame(box, bg=Theme.BG_MAIN)
+        msg_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        
+        tk.Label(msg_frame, text=message, font=(Theme.FONT, 10),
+                bg=Theme.BG_MAIN, fg=Theme.TEXT, justify="left", wraplength=350).pack(anchor="w")
+        
+        # Button
+        btn_frame = tk.Frame(box, bg=Theme.BG_MAIN)
+        btn_frame.pack(fill="x", padx=20, pady=(10, 20))
+        
+        def close():
+            box.destroy()
+        
+        btn = tk.Button(btn_frame, text="OK", font=(Theme.FONT, 10),
+                       bg=Theme.RED, fg=Theme.TEXT, relief="flat", 
+                       command=close, activebackground=Theme.RED, padx=20, pady=8)
+        btn.pack(side="right")
+        
+        box.focus()
+        box.grab_set()
+        box.wait_window()
+
+    @staticmethod
+    def showinfo(title, message):
+        """Themed info message box."""
+        box = tk.Toplevel()
+        box.title(title)
+        box.geometry("400x200")
+        box.configure(bg=Theme.BG_MAIN)
+        box.resizable(False, False)
+        
+        # Center on screen
+        box.update_idletasks()
+        x = (box.winfo_screenwidth() // 2) - 200
+        y = (box.winfo_screenheight() // 2) - 100
+        box.geometry(f"+{x}+{y}")
+        
+        # Icon and title
+        frame_top = tk.Frame(box, bg=Theme.BG_CARD)
+        frame_top.pack(fill="x", padx=20, pady=(20, 10))
+        
+        tk.Label(frame_top, text="ℹ️  " + title, font=(Theme.FONT, 12, "bold"),
+                bg=Theme.BG_CARD, fg=Theme.BLUE).pack(anchor="w")
+        
+        # Message
+        msg_frame = tk.Frame(box, bg=Theme.BG_MAIN)
+        msg_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        
+        tk.Label(msg_frame, text=message, font=(Theme.FONT, 10),
+                bg=Theme.BG_MAIN, fg=Theme.TEXT, justify="left", wraplength=350).pack(anchor="w")
+        
+        # Button
+        btn_frame = tk.Frame(box, bg=Theme.BG_MAIN)
+        btn_frame.pack(fill="x", padx=20, pady=(10, 20))
+        
+        def close():
+            box.destroy()
+        
+        btn = tk.Button(btn_frame, text="OK", font=(Theme.FONT, 10),
+                       bg=Theme.BLUE, fg=Theme.TEXT, relief="flat", 
+                       command=close, activebackground=Theme.BLUE, padx=20, pady=8)
+        btn.pack(side="right")
+        
+        box.focus()
+        box.grab_set()
+        box.wait_window()
+
+    @staticmethod
+    def showwarning(title, message):
+        """Themed warning message box."""
+        box = tk.Toplevel()
+        box.title(title)
+        box.geometry("400x200")
+        box.configure(bg=Theme.BG_MAIN)
+        box.resizable(False, False)
+        
+        # Center on screen
+        box.update_idletasks()
+        x = (box.winfo_screenwidth() // 2) - 200
+        y = (box.winfo_screenheight() // 2) - 100
+        box.geometry(f"+{x}+{y}")
+        
+        # Icon and title
+        frame_top = tk.Frame(box, bg=Theme.BG_CARD)
+        frame_top.pack(fill="x", padx=20, pady=(20, 10))
+        
+        tk.Label(frame_top, text="⚠️  " + title, font=(Theme.FONT, 12, "bold"),
+                bg=Theme.BG_CARD, fg=Theme.ORANGE).pack(anchor="w")
+        
+        # Message
+        msg_frame = tk.Frame(box, bg=Theme.BG_MAIN)
+        msg_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        
+        tk.Label(msg_frame, text=message, font=(Theme.FONT, 10),
+                bg=Theme.BG_MAIN, fg=Theme.TEXT, justify="left", wraplength=350).pack(anchor="w")
+        
+        # Button
+        btn_frame = tk.Frame(box, bg=Theme.BG_MAIN)
+        btn_frame.pack(fill="x", padx=20, pady=(10, 20))
+        
+        def close():
+            box.destroy()
+        
+        btn = tk.Button(btn_frame, text="OK", font=(Theme.FONT, 10),
+                       bg=Theme.ORANGE, fg=Theme.TEXT, relief="flat", 
+                       command=close, activebackground=Theme.ORANGE, padx=20, pady=8)
+        btn.pack(side="right")
+        
+        box.focus()
+        box.grab_set()
+        box.wait_window()
+
+
+# -------------------------------------------------------------------------
 # UI COMPONENTS
 # -------------------------------------------------------------------------
 
@@ -697,7 +840,7 @@ class Dropzone(tk.Frame):
             if self.on_load:
                 self.on_load(path)
         except Exception as e:
-            messagebox.showerror("Error", f"Could not load image:\n{e}")
+            ThemedMessageBox.showerror("Error", f"Could not load image:\n{e}")
             self.reset()
 
     def reset(self):
@@ -1512,12 +1655,12 @@ Pearson Correlation Coefficient:
 
     def _encode(self):
         if not self.src_path:
-            messagebox.showerror("Error", "Please select an image!")
+            ThemedMessageBox.showerror("Error", "Please select an image!")
             return
 
         msg = self.msg_txt.get().strip()
         if not msg:
-            messagebox.showerror("Error", "Please enter a message!")
+            ThemedMessageBox.showerror("Error", "Please enter a message!")
             return
 
         pwd = self.enc_pass.get() or None
@@ -1539,15 +1682,15 @@ Pearson Correlation Coefficient:
                 stego.save(save)
                 self.stego_path = save
                 self._set_status(f"Saved: {os.path.basename(save)}")
-                messagebox.showinfo(
+                ThemedMessageBox.showinfo(
                     "Success ✓", f"Message hidden!\nSaved to: {save}")
         except Exception as e:
             self._set_status("Error")
-            messagebox.showerror("Error", str(e))
+            ThemedMessageBox.showerror("Error", str(e))
 
     def _decode(self):
         if not self.stego_path:
-            messagebox.showerror("Error", "Please select a stego image!")
+            ThemedMessageBox.showerror("Error", "Please select a stego image!")
             return
 
         pwd = self.dec_pass.get() or None
@@ -1564,14 +1707,14 @@ Pearson Correlation Coefficient:
             self._set_status("Done")
 
             if not msg.startswith("No hidden"):
-                messagebox.showinfo("Success ✓", "Message extracted!")
+                ThemedMessageBox.showinfo("Success ✓", "Message extracted!")
         except Exception as e:
             self._set_status("Error")
-            messagebox.showerror("Error", str(e))
+            ThemedMessageBox.showerror("Error", str(e))
 
     def _analyze(self):
         if not self.src_path or not self.stego_path:
-            messagebox.showwarning(
+            ThemedMessageBox.showwarning(
                 "Warning", "Need both original and stego images!")
             return
 
@@ -1580,8 +1723,16 @@ Pearson Correlation Coefficient:
             mse_val, psnr_val = MathEngine.calculate_mse_psnr(
                 self.src_path, self.stego_path)
             self.mse.set(f"{mse_val:.6f}")
-            self.psnr.set(f"{psnr_val:.2f} dB" if psnr_val !=
-                          float('inf') else "∞")
+            
+            # Determine quality rating
+            if psnr_val == float('inf'):
+                psnr_display = "∞"
+                quality = "Perfect"
+            else:
+                psnr_display = f"{psnr_val:.2f} dB"
+                quality = "Excellent" if psnr_val > 50 else "Very Good" if psnr_val > 40 else "Good" if psnr_val > 30 else "Fair"
+            
+            self.psnr.set(f"{psnr_display}\n({quality})")
 
             # SSIM
             ssim_val = MathEngine.calculate_ssim(
@@ -1621,12 +1772,10 @@ Pearson Correlation Coefficient:
             self._set_status("Analysis complete")
 
             # Summary
-            quality = "Excellent" if psnr_val > 50 else "Very Good" if psnr_val > 40 else "Good" if psnr_val > 30 else "Fair"
-
-            messagebox.showinfo("Analysis Results",
+            ThemedMessageBox.showinfo("Analysis Results",
                                 f"Quality Metrics:\n"
                                 f"  • MSE: {mse_val:.6f}\n"
-                                f"  • PSNR: {psnr_val:.2f} dB ({quality})\n"
+                                f"  • PSNR: {psnr_display} ({quality})\n"
                                 f"  • SSIM: {ssim_val:.6f}\n"
                                 f"  • Correlation: {corr_val:.6f}\n\n"
                                 f"Entropy:\n"
@@ -1636,7 +1785,7 @@ Pearson Correlation Coefficient:
                                 )
 
         except Exception as e:
-            messagebox.showerror("Error", str(e))
+            ThemedMessageBox.showerror("Error", str(e))
 
     def _convert_binary(self):
         text = self.bin_entry.get()[:20]  # Limit
