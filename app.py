@@ -11,6 +11,7 @@ import os
 from datetime import datetime
 import platform
 import base64
+import re
 
 # Check for required packages
 try:
@@ -1280,6 +1281,19 @@ class App:
         self.output = TextArea(c3, 6)
         self.output.pack(fill="both", expand=True)
 
+        # Base64 Decoded Output
+        hdr4 = tk.Frame(c3, bg=Theme.BG_CARD)
+        hdr4.pack(fill="x", pady=(12, 6))
+
+        tk.Label(hdr4, text="🔤  Base64 Decoded", font=(Theme.FONT, 11, "bold"),
+                 bg=Theme.BG_CARD, fg=Theme.TEXT).pack(side="left")
+
+        Button(hdr4, "Copy", self._copy_decoded, "ghost",
+               65, 26, "📋").pack(side="right")
+
+        self.output_b64 = TextArea(c3, 4)
+        self.output_b64.pack(fill="both", expand=True)
+
     def _analysis_tab(self):
         frame = tk.Frame(self.content, bg=Theme.BG_MAIN)
         self.tabs.append(frame)
@@ -1739,8 +1753,31 @@ Pearson Correlation Coefficient:
 
             msg = StegoEngine.decode(self.stego_path, pwd)
 
+            # Show raw extracted message
             self.output.delete()
             self.output.insert(msg)
+
+            # Try Base64 decode and show separately
+            self.output_b64.delete()
+            decoded_text = None
+            raw = msg.strip()
+            if raw and not raw.startswith("No hidden"):
+                # Clean whitespace and pad to length multiple of 4
+                cleaned = re.sub(r"\s+", "", raw)
+                if cleaned:
+                    pad_len = (-len(cleaned)) % 4
+                    cleaned += "=" * pad_len
+                    try:
+                        decoded_bytes = base64.b64decode(cleaned, validate=True)
+                        try:
+                            decoded_text = decoded_bytes.decode("utf-8")
+                        except Exception:
+                            decoded_text = f"[binary data] {len(decoded_bytes)} bytes"
+                    except Exception:
+                        decoded_text = None
+
+            if decoded_text:
+                self.output_b64.insert(decoded_text)
 
             self._set_status("Done")
 
@@ -1874,6 +1911,13 @@ Pearson Correlation Coefficient:
 
     def _copy(self):
         txt = self.output.get().strip()
+        if txt:
+            self.root.clipboard_clear()
+            self.root.clipboard_append(txt)
+            self._set_status("Copied!")
+
+    def _copy_decoded(self):
+        txt = self.output_b64.get().strip()
         if txt:
             self.root.clipboard_clear()
             self.root.clipboard_append(txt)
