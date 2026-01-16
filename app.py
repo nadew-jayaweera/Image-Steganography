@@ -1477,10 +1477,27 @@ class App:
                  font=(Theme.FONT, 10), bg=Theme.BG_MAIN,
                  fg=Theme.TEXT_SEC).pack(anchor="w", pady=(2, 14))
 
+        # Two-column grid for math demos
+        grid = tk.Frame(container, bg=Theme.BG_MAIN)
+        grid.pack(fill="both", expand=True)
+        for i in range(2):
+            grid.columnconfigure(i, weight=1, uniform="math")
+
+        grid_row = 0
+        grid_col = 0
+
+        def add_card(card, span=1):
+            nonlocal grid_row, grid_col
+            card.grid(row=grid_row, column=grid_col, columnspan=span,
+                      sticky="nsew", padx=8, pady=8)
+            grid_col += span
+            if grid_col >= 2:
+                grid_row += 1
+                grid_col = 0
 
         # Base64 Encoding
-        b64_card = Card(container)
-        b64_card.pack(fill="x", pady=(0, 12))
+        b64_card = Card(grid)
+        add_card(b64_card)
 
         b64_c = tk.Frame(b64_card, bg=Theme.BG_CARD)
         b64_c.pack(fill="both", padx=14, pady=14)
@@ -1506,16 +1523,16 @@ class App:
         b64_result_frame.pack(fill="x", pady=(8, 0))
 
         self.b64_result = tk.Label(b64_result_frame, text="", font=(Theme.MONO, 9),
-                                   bg=Theme.BG_CARD, fg=Theme.CYAN,
-                                   justify="left", anchor="w", wraplength=400)
+                       bg=Theme.BG_CARD, fg=Theme.CYAN,
+                       justify="left", anchor="w", wraplength=320)
         self.b64_result.pack(side="left", fill="both", expand=True)
 
         Button(b64_result_frame, "Copy", self._copy_base64_result,
                "purple", 70, 34).pack(side="left", padx=(8, 0))
 
         # Binary Conversion
-        bin_card = Card(container)
-        bin_card.pack(fill="x", pady=(0, 12))
+        bin_card = Card(grid)
+        add_card(bin_card)
 
         bin_c = tk.Frame(bin_card, bg=Theme.BG_CARD)
         bin_c.pack(fill="both", padx=14, pady=14)
@@ -1549,8 +1566,8 @@ class App:
                "purple", 70, 34).pack(side="left", padx=(8, 0))
 
         # XOR Demonstration
-        xor_card = Card(container)
-        xor_card.pack(fill="x", pady=(0, 12))
+        xor_card = Card(grid)
+        add_card(xor_card)
 
         xor_c = tk.Frame(xor_card, bg=Theme.BG_CARD)
         xor_c.pack(fill="both", padx=14, pady=14)
@@ -1588,8 +1605,8 @@ class App:
                "purple", 70, 34).pack(side="left", padx=(8, 0))
 
         # LSB Explanation
-        lsb_card = Card(container)
-        lsb_card.pack(fill="x", pady=(0, 12))
+        lsb_card = Card(grid)
+        add_card(lsb_card)
 
         lsb_c = tk.Frame(lsb_card, bg=Theme.BG_CARD)
         lsb_c.pack(fill="both", padx=14, pady=14)
@@ -1618,8 +1635,8 @@ How LSB works:
                  justify="left", anchor="w").pack(anchor="w")
 
         # Formulas Reference
-        form_card = Card(container)
-        form_card.pack(fill="x")
+        form_card = Card(grid)
+        add_card(form_card, span=2)
 
         form_c = tk.Frame(form_card, bg=Theme.BG_CARD)
         form_c.pack(fill="both", padx=14, pady=14)
@@ -2017,3 +2034,4 @@ if __name__ == "__main__":
             pass
 
     root.mainloop()
+    #test
