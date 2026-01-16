@@ -10,6 +10,7 @@ import math
 import os
 from datetime import datetime
 import platform
+import base64
 
 # Check for required packages
 try:
@@ -306,6 +307,7 @@ class MathEngine:
             'bits_per_pixel': channels
         }
 
+    
 
 # -------------------------------------------------------------------------
 # STEGANOGRAPHY ENGINE
@@ -1432,6 +1434,45 @@ class App:
         tk.Label(container, text="Understanding the math behind steganography",
                  font=(Theme.FONT, 10), bg=Theme.BG_MAIN,
                  fg=Theme.TEXT_SEC).pack(anchor="w", pady=(2, 14))
+
+
+        # Base 64 encoding
+
+        
+        bin_card = Card(container)
+        bin_card.pack(fill="x", pady=(0, 12))
+
+        bin_c = tk.Frame(bin_card, bg=Theme.BG_CARD)
+        bin_c.pack(fill="both", padx=14, pady=14)
+
+        tk.Label(bin_c, text="🔢  Base-64 Encoding", font=(Theme.FONT, 11, "bold"),
+                 bg=Theme.BG_CARD, fg=Theme.TEXT).pack(anchor="w")
+        tk.Label(bin_c, text="Each character → ASCII → 8-bit binary",
+                 font=(Theme.FONT, 9), bg=Theme.BG_CARD, fg=Theme.TEXT_MUTED).pack(anchor="w", pady=(2, 8))
+
+        bin_input_frame = tk.Frame(bin_c, bg=Theme.BG_CARD)
+        bin_input_frame.pack(fill="x", pady=(0, 8))
+
+        tk.Label(bin_input_frame, text="Text:", font=(Theme.FONT, 10),
+                 bg=Theme.BG_CARD, fg=Theme.TEXT_SEC).pack(side="left")
+
+        self.bin_entry = Entry(bin_input_frame)
+        self.bin_entry.pack(side="left", fill="x", expand=True, padx=(8, 8))
+
+        Button(bin_input_frame, "Convert", self._convert_binary,
+               "cyan", 90, 34).pack(side="left")
+
+        bin_result_frame = tk.Frame(bin_c, bg=Theme.BG_CARD)
+        bin_result_frame.pack(fill="x", pady=(8, 0))
+
+        self.bin_result = tk.Label(bin_result_frame, text="", font=(Theme.MONO, 9),
+                                   bg=Theme.BG_CARD, fg=Theme.CYAN,
+                                   justify="left", anchor="w")
+        self.bin_result.pack(side="left", fill="both", expand=True)
+
+        Button(bin_result_frame, "Copy", self._copy_binary_result,
+               "purple", 70, 34).pack(side="left", padx=(8, 0))
+        
 
         # Binary Conversion
         bin_card = Card(container)
