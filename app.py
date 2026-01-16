@@ -1102,7 +1102,7 @@ class App:
                      bg=Theme.SIDEBAR, fg=Theme.CYAN).pack(side="left")
 
         # Version
-        tk.Label(sb, text="v3.0 Math Edition", font=(Theme.FONT, 8),
+        tk.Label(sb, text="v1.0.1 Math Edition", font=(Theme.FONT, 8),
                  bg=Theme.SIDEBAR, fg=Theme.TEXT_MUTED).pack(side="bottom", pady=14)
 
     def _header(self):
