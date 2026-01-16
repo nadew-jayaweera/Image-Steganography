@@ -371,7 +371,12 @@ class StegoEngine:
                     if message.endswith("<<END>>"):
                         result = message[:-7]
                         if password:
-                            result = StegoEngine._xor_cipher(result, password)
+                            decrypted = StegoEngine._xor_cipher(result, password)
+                            # Check if decrypted result looks like valid text
+                            if not StegoEngine._is_probable_text(decrypted):
+                                return "<<WRONG_PASSWORD>>"
+                            return decrypted
+                        # No password - return as-is
                         return result
                 except:
                     continue
@@ -384,6 +389,29 @@ class StegoEngine:
         if not key:
             return text
         return ''.join(chr(ord(c) ^ ord(key[i % len(key)])) for i, c in enumerate(text))
+
+    @staticmethod
+    def _is_probable_text(s):
+        """Check if string looks like readable text."""
+        if not s:
+            return False
+        total = len(s)
+        printable = 0
+        control_chars = 0
+        for ch in s:
+            o = ord(ch)
+            if 32 <= o <= 126:  # Printable ASCII
+                printable += 1
+            elif ch in "\n\r\t":  # Common whitespace
+                printable += 1
+            elif o < 32 or o > 126:  # Control/non-ASCII
+                control_chars += 1
+        
+        ratio = printable / total
+        control_ratio = control_chars / total
+        
+        # Must be 90%+ printable AND less than 30% control chars
+        return ratio >= 0.90 and control_ratio < 0.30
 
     @staticmethod
     def get_metadata(image_path):
@@ -1752,6 +1780,13 @@ Pearson Correlation Coefficient:
             self.root.update()
 
             msg = StegoEngine.decode(self.stego_path, pwd)
+
+            if msg == "<<WRONG_PASSWORD>>":
+                self.output.delete()
+                self.output_b64.delete()
+                self._set_status("Wrong password")
+                ThemedMessageBox.showerror("Error", "Wrong password")
+                return
 
             # Show raw extracted message
             self.output.delete()
