@@ -11,6 +11,7 @@ import os
 from datetime import datetime
 import platform
 import base64
+import re
 
 # Check for required packages
 try:
@@ -370,7 +371,12 @@ class StegoEngine:
                     if message.endswith("<<END>>"):
                         result = message[:-7]
                         if password:
-                            result = StegoEngine._xor_cipher(result, password)
+                            decrypted = StegoEngine._xor_cipher(result, password)
+                            # Check if decrypted result looks like valid text
+                            if not StegoEngine._is_probable_text(decrypted):
+                                return "<<WRONG_PASSWORD>>"
+                            return decrypted
+                        # No password - return as-is
                         return result
                 except:
                     continue
@@ -383,6 +389,29 @@ class StegoEngine:
         if not key:
             return text
         return ''.join(chr(ord(c) ^ ord(key[i % len(key)])) for i, c in enumerate(text))
+
+    @staticmethod
+    def _is_probable_text(s):
+        """Check if string looks like readable text."""
+        if not s:
+            return False
+        total = len(s)
+        printable = 0
+        control_chars = 0
+        for ch in s:
+            o = ord(ch)
+            if 32 <= o <= 126:  # Printable ASCII
+                printable += 1
+            elif ch in "\n\r\t":  # Common whitespace
+                printable += 1
+            elif o < 32 or o > 126:  # Control/non-ASCII
+                control_chars += 1
+        
+        ratio = printable / total
+        control_ratio = control_chars / total
+        
+        # Must be 90%+ printable AND less than 30% control chars
+        return ratio >= 0.90 and control_ratio < 0.30
 
     @staticmethod
     def get_metadata(image_path):
@@ -1101,7 +1130,7 @@ class App:
                      bg=Theme.SIDEBAR, fg=Theme.CYAN).pack(side="left")
 
         # Version
-        tk.Label(sb, text="v3.0 Math Edition", font=(Theme.FONT, 8),
+        tk.Label(sb, text="v1.0.1 Edition", font=(Theme.FONT, 8),
                  bg=Theme.SIDEBAR, fg=Theme.TEXT_MUTED).pack(side="bottom", pady=14)
 
     def _header(self):
@@ -1280,6 +1309,19 @@ class App:
         self.output = TextArea(c3, 6)
         self.output.pack(fill="both", expand=True)
 
+        # Base64 Decoded Output
+        hdr4 = tk.Frame(c3, bg=Theme.BG_CARD)
+        hdr4.pack(fill="x", pady=(12, 6))
+
+        tk.Label(hdr4, text="🔤  Base64 Decoded", font=(Theme.FONT, 11, "bold"),
+                 bg=Theme.BG_CARD, fg=Theme.TEXT).pack(side="left")
+
+        Button(hdr4, "Copy", self._copy_decoded, "ghost",
+               65, 26, "📋").pack(side="right")
+
+        self.output_b64 = TextArea(c3, 4)
+        self.output_b64.pack(fill="both", expand=True)
+
     def _analysis_tab(self):
         frame = tk.Frame(self.content, bg=Theme.BG_MAIN)
         self.tabs.append(frame)
@@ -1436,7 +1478,41 @@ class App:
                  fg=Theme.TEXT_SEC).pack(anchor="w", pady=(2, 14))
 
 
-        
+        # Base64 Encoding
+        b64_card = Card(container)
+        b64_card.pack(fill="x", pady=(0, 12))
+
+        b64_c = tk.Frame(b64_card, bg=Theme.BG_CARD)
+        b64_c.pack(fill="both", padx=14, pady=14)
+
+        tk.Label(b64_c, text="🔤  Base64 Encoding", font=(Theme.FONT, 11, "bold"),
+                 bg=Theme.BG_CARD, fg=Theme.TEXT).pack(anchor="w")
+        tk.Label(b64_c, text="Convert text to Base64 for data transmission",
+                 font=(Theme.FONT, 9), bg=Theme.BG_CARD, fg=Theme.TEXT_MUTED).pack(anchor="w", pady=(2, 8))
+
+        b64_input_frame = tk.Frame(b64_c, bg=Theme.BG_CARD)
+        b64_input_frame.pack(fill="x", pady=(0, 8))
+
+        tk.Label(b64_input_frame, text="Text:", font=(Theme.FONT, 10),
+                 bg=Theme.BG_CARD, fg=Theme.TEXT_SEC).pack(side="left")
+
+        self.b64_entry = Entry(b64_input_frame)
+        self.b64_entry.pack(side="left", fill="x", expand=True, padx=(8, 8))
+
+        Button(b64_input_frame, "Encode", self._encode_base64,
+               "cyan", 90, 34).pack(side="left")
+
+        b64_result_frame = tk.Frame(b64_c, bg=Theme.BG_CARD)
+        b64_result_frame.pack(fill="x", pady=(8, 0))
+
+        self.b64_result = tk.Label(b64_result_frame, text="", font=(Theme.MONO, 9),
+                                   bg=Theme.BG_CARD, fg=Theme.CYAN,
+                                   justify="left", anchor="w", wraplength=400)
+        self.b64_result.pack(side="left", fill="both", expand=True)
+
+        Button(b64_result_frame, "Copy", self._copy_base64_result,
+               "purple", 70, 34).pack(side="left", padx=(8, 0))
+
         # Binary Conversion
         bin_card = Card(container)
         bin_card.pack(fill="x", pady=(0, 12))
@@ -1705,8 +1781,38 @@ Pearson Correlation Coefficient:
 
             msg = StegoEngine.decode(self.stego_path, pwd)
 
+            if msg == "<<WRONG_PASSWORD>>":
+                self.output.delete()
+                self.output_b64.delete()
+                self._set_status("Wrong password")
+                ThemedMessageBox.showerror("Error", "Wrong password")
+                return
+
+            # Show raw extracted message
             self.output.delete()
             self.output.insert(msg)
+
+            # Try Base64 decode and show separately
+            self.output_b64.delete()
+            decoded_text = None
+            raw = msg.strip()
+            if raw and not raw.startswith("No hidden"):
+                # Clean whitespace and pad to length multiple of 4
+                cleaned = re.sub(r"\s+", "", raw)
+                if cleaned:
+                    pad_len = (-len(cleaned)) % 4
+                    cleaned += "=" * pad_len
+                    try:
+                        decoded_bytes = base64.b64decode(cleaned, validate=True)
+                        try:
+                            decoded_text = decoded_bytes.decode("utf-8")
+                        except Exception:
+                            decoded_text = f"[binary data] {len(decoded_bytes)} bytes"
+                    except Exception:
+                        decoded_text = None
+
+            if decoded_text:
+                self.output_b64.insert(decoded_text)
 
             self._set_status("Done")
 
@@ -1845,6 +1951,13 @@ Pearson Correlation Coefficient:
             self.root.clipboard_append(txt)
             self._set_status("Copied!")
 
+    def _copy_decoded(self):
+        txt = self.output_b64.get().strip()
+        if txt:
+            self.root.clipboard_clear()
+            self.root.clipboard_append(txt)
+            self._set_status("Copied!")
+
     def _switch(self, idx):
         self.current_tab = idx
 
@@ -1859,6 +1972,21 @@ Pearson Correlation Coefficient:
                 tab.pack(fill="both", expand=True)
             else:
                 tab.pack_forget()
+
+    def _encode_base64(self):
+        text = self.b64_entry.get()
+        if not text:
+            return
+        
+        encoded = base64.b64encode(text.encode()).decode()
+        self.b64_result_text = encoded
+        self.b64_result.config(text=encoded)
+
+    def _copy_base64_result(self):
+        if hasattr(self, 'b64_result_text') and self.b64_result_text:
+            self.root.clipboard_clear()
+            self.root.clipboard_append(self.b64_result_text)
+            self._set_status("Base64 result copied!")
 
     def _set_status(self, txt):
         self.status.config(text=txt)
