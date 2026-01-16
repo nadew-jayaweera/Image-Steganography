@@ -1436,7 +1436,41 @@ class App:
                  fg=Theme.TEXT_SEC).pack(anchor="w", pady=(2, 14))
 
 
-        
+        # Base64 Encoding
+        b64_card = Card(container)
+        b64_card.pack(fill="x", pady=(0, 12))
+
+        b64_c = tk.Frame(b64_card, bg=Theme.BG_CARD)
+        b64_c.pack(fill="both", padx=14, pady=14)
+
+        tk.Label(b64_c, text="🔤  Base64 Encoding", font=(Theme.FONT, 11, "bold"),
+                 bg=Theme.BG_CARD, fg=Theme.TEXT).pack(anchor="w")
+        tk.Label(b64_c, text="Convert text to Base64 for data transmission",
+                 font=(Theme.FONT, 9), bg=Theme.BG_CARD, fg=Theme.TEXT_MUTED).pack(anchor="w", pady=(2, 8))
+
+        b64_input_frame = tk.Frame(b64_c, bg=Theme.BG_CARD)
+        b64_input_frame.pack(fill="x", pady=(0, 8))
+
+        tk.Label(b64_input_frame, text="Text:", font=(Theme.FONT, 10),
+                 bg=Theme.BG_CARD, fg=Theme.TEXT_SEC).pack(side="left")
+
+        self.b64_entry = Entry(b64_input_frame)
+        self.b64_entry.pack(side="left", fill="x", expand=True, padx=(8, 8))
+
+        Button(b64_input_frame, "Encode", self._encode_base64,
+               "cyan", 90, 34).pack(side="left")
+
+        b64_result_frame = tk.Frame(b64_c, bg=Theme.BG_CARD)
+        b64_result_frame.pack(fill="x", pady=(8, 0))
+
+        self.b64_result = tk.Label(b64_result_frame, text="", font=(Theme.MONO, 9),
+                                   bg=Theme.BG_CARD, fg=Theme.CYAN,
+                                   justify="left", anchor="w", wraplength=400)
+        self.b64_result.pack(side="left", fill="both", expand=True)
+
+        Button(b64_result_frame, "Copy", self._copy_base64_result,
+               "purple", 70, 34).pack(side="left", padx=(8, 0))
+
         # Binary Conversion
         bin_card = Card(container)
         bin_card.pack(fill="x", pady=(0, 12))
@@ -1859,6 +1893,21 @@ Pearson Correlation Coefficient:
                 tab.pack(fill="both", expand=True)
             else:
                 tab.pack_forget()
+
+    def _encode_base64(self):
+        text = self.b64_entry.get()
+        if not text:
+            return
+        
+        encoded = base64.b64encode(text.encode()).decode()
+        self.b64_result_text = encoded
+        self.b64_result.config(text=encoded)
+
+    def _copy_base64_result(self):
+        if hasattr(self, 'b64_result_text') and self.b64_result_text:
+            self.root.clipboard_clear()
+            self.root.clipboard_append(self.b64_result_text)
+            self._set_status("Base64 result copied!")
 
     def _set_status(self, txt):
         self.status.config(text=txt)
