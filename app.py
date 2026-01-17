@@ -1846,7 +1846,7 @@ Pearson Correlation Coefficient:
             return
 
         try:
-            # MSE & PSNR
+            # MSE & PSNR.
             mse_val, psnr_val = MathEngine.calculate_mse_psnr(
                 self.src_path, self.stego_path)
             self.mse.set(f"{mse_val:.6f}")
