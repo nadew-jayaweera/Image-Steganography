@@ -2019,7 +2019,7 @@ if __name__ == "__main__":
 
     try:
         if platform.system() == "Windows":
-            root.iconbitmap("icon.ico")
+            root.iconbitmap(".venv/cybermaths.ico")
     except:
         pass
 
