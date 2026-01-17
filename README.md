@@ -60,8 +60,8 @@ git clone https://github.com/nadew-jayaweera/Image-Steganography.git
 - Python 3.x
 - See `requirements.txt` for dependencies.
 
-Optional (if packaging into a standalone binary):
-- `pyinstaller` or `cx_Freeze`
+Check our [Releases](https://github.com/nadew-jayaweera/Image-Steganography/releases/tag/v1.0.0):
+- Run `app.exe`
 
 ```bash
 pip install -r requirements.txt
