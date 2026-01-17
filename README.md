@@ -1,103 +1,116 @@
-# Image Steganography Tool
+# CyberMaths Steganography Tool
 
-**A Tkinter GUI application that demonstrates image steganography, simple XOR encryption, and mathematical analysis (MSE / PSNR).**
+![Python](https://img.shields.io/badge/Python-3.9%2B-blue?style=for-the-badge&logo=python)
+![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-gray?style=for-the-badge)
+![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
+
+> **A robust Tkinter GUI application for LSB image steganography, XOR encryption, and quantitative image analysis (MSE/PSNR).**
 
 ---
 
-## Table of Contents
-- [Overview](#overview)
-- [Features](#features)
-- [Maths & Algorithms](#maths--algorithms)
-- [Installation](#installation)
-- [Usage](#usage)
-- [GUI Overview](#gui-overview)
-- [Acknowledgements](#acknowledgements)
+## Gallery
+
+| **Encryption Tab** | **Analysis Tab** |
+|:---:|:---:|
+| ![Encode Preview](https://via.placeholder.com/400x300?text=Encode+Tab+Screenshot) | ![Analysis Preview](https://via.placeholder.com/400x300?text=Analysis+Tab+Screenshot) |
+
 
 ---
 
 ## Overview
-`CyberMaths Steganography Tool` is a desktop GUI (Tkinter) application that hides text inside images using Least Significant Bit (LSB) steganography, optionally combined with a simple XOR-based encryption. It also computes image quality metrics (MSE and PSNR) to analyze the visual difference between the original and stego images, and provides a lightweight EXIF-style metadata reader.
+**CyberMaths Steganography Tool** is a desktop application designed to bridge the gap between cryptography and digital image processing. It allows users to hide secret text messages inside images using **Least Significant Bit (LSB)** manipulation. 
+
+Beyond simple hiding, this tool emphasizes educational value by including:
+* **XOR Encryption** to demonstrate basic symmetric ciphers.
+* **Mathematical Analysis** to mathematically quantify the visual distortion introduced by steganography.
+* **Metadata Inspection** for checking file integrity and properties.
 
 ---
 
-## Features
-- Load an image and hide a secret message using LSB steganography.
-- Optional XOR-based encryption of the message before embedding.
-- Save the generated stego image as a PNG.
-- Load the stego image and reveal the hidden message (auto-decrypt if password used).
-- Calculate MSE (Mean Squared Error) and PSNR (Peak Signal-to-Noise Ratio) between two images for quantitative analysis.
-- Lightweight metadata / EXIF-like reader using `Pillow` and file system stats.
-- Theme-aware GUI (dark/light/system) with a polished layout and user-friendly dialogs.
+## Key Features
+* **🔒 LSB Steganography:** Hide messages within the pixel data of PNG, JPG, or BMP images.
+* **🔑 XOR Encryption:** Optional layer of security that encrypts your message before embedding it.
+* **📊 Mathematical Analysis:** Built-in tools to calculate **MSE** and **PSNR** to verify image quality retention.
+* **🖼️ Theme-Aware GUI:** Modern Interface that adapts to your system theme (Dark/Light modes supported).
+* **📂 Smart Decoding:** Auto-detects and reveals hidden messages from loaded stego-images.
+* **📝 EXIF Reader:** Lightweight metadata viewer to inspect image properties on the fly.
 
 ---
 
 ## Maths & Algorithms
 
-### LSB Encoding / Decoding
-- The message is converted to 8-bit binary and a sentinel `$$STOP$$` is appended to mark the end of the message.
-- Bits are written into the least-significant-bit of each channel byte of the image array (flattened).
-- During decode, LSBs are read and reassembled into bytes until the sentinel is detected.
+### 1. LSB Encoding (The "Hiding" Process)
+The tool converts your message into an 8-bit binary stream. It then iterates through the image's flattened pixel array, replacing the **Least Significant Bit (LSB)** of each color channel with a message bit. 
+* **Sentinel:** A `$$STOP$$` marker is appended to the message so the decoder knows exactly where to stop reading.
 
-### XOR Encryption (Optional)
-- A simple bytewise XOR of the message with the provided key string. XOR is symmetric: the same operation both encrypts and decrypts.
-- Implemented as a demonstration of Boolean algebra techniques (not cryptographically secure).
+### 2. Boolean Algebra (XOR Encryption)
+If enabled, the message undergoes a bitwise exclusive-OR operation against a user-provided password before embedding.
+* **Formula:** $C = M \oplus K$
+* *Note: This acts as a symmetric cipher; the same operation is used to decrypt.*
 
-### Image Quality Metrics
-- **MSE (Mean Squared Error)**: average squared difference per pixel between original and stego image arrays.
-- **PSNR (Peak Signal-to-Noise Ratio)**: calculated as `20 * log10(MAX / sqrt(MSE))`, where `MAX = 255` for 8-bit images.
-- MSE close to 0 indicates minimal change; higher PSNR indicates better perceived image quality.
+### 3. Signal Processing Metrics
+To ensure the stego-image looks identical to the original, we use two standard metrics:
 
----
+* **Mean Squared Error (MSE):** Measures the average squared difference between the original ($I$) and modified ($K$) image pixels.
+    $$MSE = \frac{1}{mn} \sum_{i=0}^{m-1} \sum_{j=0}^{n-1} [I(i, j) - K(i, j)]^2$$
 
-## Installation
-
-**Clone repository:**
-```
-git clone https://github.com/nadew-jayaweera/Image-Steganography.git
-```
-
-**Requirements** (tested with Python 3.9+):
-- Python 3.x
-- See `requirements.txt` for dependencies.
-
-Check our [Releases](https://github.com/nadew-jayaweera/Image-Steganography/releases/tag/v1.0.0):
-- Run `app.exe`
-
-```bash
-pip install -r requirements.txt
-```
+* **Peak Signal-to-Noise Ratio (PSNR):** Expressed in decibels (dB), this compares the maximum possible pixel power to the corrupting noise (MSE).
+    $$PSNR = 20 \cdot \log_{10}\left(\frac{MAX_I}{\sqrt{MSE}}\right)$$
+    *(Where $MAX_I$ is 255 for standard 8-bit images. Higher PSNR = Better Quality.)*
 
 ---
 
-## Usage
+## ⚙️ Installation
 
-1. Run the application:
+### Prerequisites
+* Python 3.9 or higher
+* Git
+
+### Steps
+1.  **Clone the repository:**
+    ```bash
+    git clone [https://github.com/nadew-jayaweera/Image-Steganography.git](https://github.com/nadew-jayaweera/Image-Steganography.git)
+    cd Image-Steganography
+    ```
+
+2.  **Install Dependencies:**
+    It is recommended to use a virtual environment.
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+---
+
+## Usage Guide
+
+### Method 1: Running from Source
+Execute the main script via your terminal:
 ```bash
 python app.py
 ```
 
-2. **Encode (Hide)** tab:
-   - Click **Load Image** and choose a PNG/JPG/BMP (PNG is recommended for lossless output).
-   - Enter the secret message in the text box.
-   - (Optional) Enter a password and select the `LSB + XOR Encryption` technique.
-   - Click **ENCRYPT & SAVE IMAGE** and choose a file path (PNG recommended).
-
-3. **Decode (Reveal)** tab:
-   - Click **Load Stego Image** (prefer PNG/BMP for accurate bit preservation).
-   - If encryption was used, enter the same password in the Decryption Password box.
-   - Click **REVEAL HIDDEN MESSAGE** to display the recovered message.
-
-4. **Maths Analysis** tab:
-   - Load or keep the original and the produced stego image paths set (the app auto-loads the saved stego for analysis after saving).
-   - Click **Calculate Metrics** to compute MSE and PSNR; results display in the Analysis tab.
+### Method 2: Running the Executable (Windows)
+Download the standalone `app.exe` from our **Releases Page** and run it directly. No Python installation required.
 
 ---
 
-## GUI Overview
-- Three main tabs: **Encode (Hide)**, **Decode (Reveal)**, and **Maths Analysis**.
-- Theme selector (Dark / Light / System) detects the OS and allows switching.
-- Image preview areas for both encode and decode flows.
-- The app displays a small EXIF-like metadata output when a stego image is loaded.
+## 📝 Step-by-Step Instructions
+
+### Tab 1: Encode (Hide)
+1. Click **Load Image** (Select PNG for lossless quality).
+2. Type your secret message into the text area.
+3. *(Optional)* Enter a password to enable **XOR Encryption**.
+4. Click **ENCRYPT & SAVE**. Select a destination to save your new "Stego-Image".
+
+### Tab 2: Decode (Reveal)
+1. Click **Load Stego Image** and select the image containing the hidden text.
+2. If you used a password during encoding, enter it in the **Decryption Password** field.
+3. Click **REVEAL HIDDEN MESSAGE**. The text will appear on the screen.
+
+### Tab 3: Maths Analysis
+1. Ensure both the **Original Image** and **Stego Image** are loaded (this happens automatically after encoding).
+2. Click **Calculate Metrics**.
+3. Review the **MSE** (should be close to 0) and **PSNR** (should be high, typically >50dB) to verify that the changes are invisible to the naked eye.
 
 ---
 
@@ -109,6 +122,7 @@ Contributions, bug reports, and improvements are welcome. Suggested improvements
 
 ---
 
-## Acknowledgements
-- Project generated based on the provided `app.py`. fileciteturn0file0
-- Uses `Pillow` and `numpy` for image processing and numerical work.
+## ⚖️ License
+This project is released under MIT-style permissive terms (add your preferred license header).
+
+---
