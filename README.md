@@ -9,11 +9,6 @@
 ---
 
 
-![App Preview](https://i.ibb.co/SSQg1DV/Screenshot-2026-01-18-031651.png) 
-
-
----
-
 ## Overview
 **CyberMaths Steganography Tool** is a desktop application designed to bridge the gap between cryptography and digital image processing. It allows users to hide secret text messages inside images using **Least Significant Bit (LSB)** manipulation. 
 
@@ -21,6 +16,8 @@ Beyond simple hiding, this tool emphasizes educational value by including:
 * **XOR Encryption** to demonstrate basic symmetric ciphers.
 * **Mathematical Analysis** to mathematically quantify the visual distortion introduced by steganography.
 * **Metadata Inspection** for checking file integrity and properties.
+
+![App Preview](https://i.ibb.co/SSQg1DV/Screenshot-2026-01-18-031651.png) 
 
 ---
 
