@@ -8,11 +8,8 @@
 
 ---
 
-## Gallery
 
-| **Encryption Tab** | **Analysis Tab** |
-|:---:|:---:|
-| ![Encode Preview](https://via.placeholder.com/400x300?text=Encode+Tab+Screenshot) | ![Analysis Preview](https://via.placeholder.com/400x300?text=Analysis+Tab+Screenshot) |
+![App Preview](https://i.ibb.co/SSQg1DV/Screenshot-2026-01-18-031651.png) 
 
 
 ---
