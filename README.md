@@ -61,9 +61,10 @@ To ensure the stego-image looks identical to the original, we use two standard m
 * Git
 
 ### Steps
+
 1.  **Clone the repository:**
     ```bash
-    git clone [https://github.com/nadew-jayaweera/Image-Steganography.git](https://github.com/nadew-jayaweera/Image-Steganography.git)
+    git clone https://github.com/nadew-jayaweera/Image-Steganography.git
     cd Image-Steganography
     ```
 
