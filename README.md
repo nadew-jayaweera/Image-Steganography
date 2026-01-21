@@ -118,6 +118,6 @@ Contributions, bug reports, and improvements are welcome. Suggested improvements
 ---
 
 ## ⚖️ License
-This project is released under MIT-style permissive terms (add your preferred license header).
+This project is released under MIT-style permissive terms.
 
 ---
